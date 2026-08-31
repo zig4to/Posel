@@ -10,9 +10,9 @@ export const config = {
     /*
      * Ujemi vse poti razen:
      * - _next/static, _next/image (statične datoteke Next.js)
-     * - favicon.ico
-     * - datotek s končnico (slike, ipd.)
+     * - favicon.ico, manifest.webmanifest (metadata datoteke)
+     * - datotek s končnico (slike, ikone, ipd.)
      */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|webmanifest)$).*)",
   ],
 };

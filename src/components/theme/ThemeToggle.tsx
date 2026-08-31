@@ -63,6 +63,9 @@ export default function ThemeToggle() {
   // razveljavilo delo inline skripte.
   useLayoutEffect(() => {
     const stored = readStored();
+    // Namerno: sinhronizacija z localStorage, ki je SSR ne pozna (glej
+    // Next.js "preventing flash before hydration").
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPref(stored);
     applyTheme(stored);
   }, []);
