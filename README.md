@@ -1,36 +1,65 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Posel — Stranke in koledar
 
-## Getting Started
+Aplikacija za sledenje strankam in poslovnemu urniku: mesečni koledar na domači strani (obarvan po strankah, filter po stranki) + zavihek Stranke za CRUD nad kontaktnimi podatki.
 
-First, run the development server:
+Zgrajeno z **Next.js (App Router) + Supabase (Postgres, Auth, RLS) + Tailwind CSS**, gostovano na **Vercel**.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## 1. Ustvari Supabase projekt
+
+1. Pojdi na [supabase.com](https://supabase.com) → **New project** (brezplačen paket zadostuje).
+2. Ko je projekt ustvarjen, pojdi v **SQL Editor** in prilepi celotno vsebino datoteke [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql), nato zaženi (Run). To ustvari tabeli `clients` in `work_entries` z ustreznimi pravili dostopa (RLS).
+3. Pojdi v **Authentication → Users → Add user** in ustvari svojega uporabnika (e-pošta + geslo). Javna registracija v aplikaciji ni na voljo — to je namerno, gre za zasebno aplikacijo.
+4. Pojdi v **Project Settings → API** in si zapiši:
+   - `Project URL`
+   - `anon public` ključ
+
+## 2. Nastavi okoljske spremenljivke
+
+Podvoji `.env.example` v `.env.local` (če še ni narejeno) in vpiši svoje vrednosti:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=https://xxxxxxxxxxxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 3. Zaženi lokalno
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm install
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Odpri [http://localhost:3000](http://localhost:3000) — preusmeri te na `/login`. Prijavi se z uporabnikom, ki si ga ustvaril/a v koraku 1.3.
 
-## Learn More
+### Preverjanje, da vse deluje
 
-To learn more about Next.js, take a look at the following resources:
+- **Stranke**: pojdi v zavihek "Stranke" → "+ Dodaj stranko", izpolni podatke, shrani. Stranka naj dobi samodejno barvo in se pojavi na seznamu.
+- **Koledar**: na domači strani klikni na poljuben dan → "+ Dodaj vnos" → izberi stranko in čas od-do → shrani. Barvna oznaka stranke naj se pojavi na tistem dnevu v koledarju.
+- **Filter**: klikni gumb "Filter" zgoraj desno na koledarju, izberi stranko — koledar naj prikaže samo dneve/vnose te stranke. Izberi "Vse stranke" za ponastavitev.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 4. Objava na Vercel
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. Ustvari git repozitorij in ga poveži z [Vercel](https://vercel.com) (Import Project).
+2. V nastavitvah projekta na Vercel (Settings → Environment Variables) dodaj enaki spremenljivki kot v `.env.local` (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`).
+3. Deploy. Po uspešnem deployu preveri prijavo in dodajanje vnosa na produkcijskem naslovu.
 
-## Deploy on Vercel
+## Struktura projekta
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```
+supabase/migrations/0001_init.sql   # shema baze (zaženi ročno v Supabase SQL Editor)
+middleware.ts                       # zaščita rout (redirect na /login brez seje)
+src/app/(app)/page.tsx              # "/" — koledar (domača stran)
+src/app/(app)/stranke/              # seznam, dodajanje, pregled, urejanje strank
+src/app/login/                      # prijava
+src/components/calendar/            # koledar, filter, dnevni panel, obrazec za vnos ur
+src/components/clients/             # obrazec in seznam strank
+src/actions/                        # Server Actions (create/update/delete)
+src/lib/supabase/                   # Supabase klienti (browser, server, middleware)
+src/lib/data/                       # poizvedbe (branje) za stranke in vnose
+src/lib/utils/                      # koledarska mreža, paleta barv
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Prihodnje razširitve (niso del te verzije)
+
+- Ročna izbira barve stranke (polje `color` v `clients` že obstaja, trenutno se dodeli samodejno).
+- Več uporabnikov — shema in RLS (`user_id = auth.uid()`) sta že pripravljena, dodati je treba le registracijo/povabila.
