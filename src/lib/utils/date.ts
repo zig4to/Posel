@@ -33,6 +33,7 @@ export type CalendarDay = {
   dateKey: string; // "YYYY-MM-DD", lokalni datum
   isCurrentMonth: boolean;
   isToday: boolean;
+  isWeekend: boolean;
 };
 
 function pad2(n: number): string {
@@ -77,11 +78,13 @@ export function getMonthGrid(year: number, month: number): CalendarDay[] {
       gridStart.getMonth(),
       gridStart.getDate() + i
     );
+    const weekday = date.getDay(); // Nedelja=0 ... Sobota=6
     days.push({
       date,
       dateKey: formatDateKey(date),
       isCurrentMonth: date.getMonth() === month,
       isToday: isSameDay(date, today),
+      isWeekend: weekday === 0 || weekday === 6,
     });
   }
 
