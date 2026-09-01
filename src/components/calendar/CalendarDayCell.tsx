@@ -47,7 +47,18 @@ export default function CalendarDayCell({
       }
       className={clsx(
         "flex min-w-0 flex-col items-start gap-1 overflow-hidden rounded-md p-1.5 text-left transition-[filter,background-color,border-color] sm:p-2",
-        large ? "h-28 sm:h-36" : "h-20 sm:h-24",
+        // Na mobilnem naj bo kartica minimalne višine (prilagojena vsebini).
+        // Dnevi trenutnega meseca imajo spodnjo mejo približno višine ene
+        // vrstice vnosa (da prazni dnevi niso videti "stlačeni" glede na
+        // sosednje dneve z enim vnosom); dnevi izven meseca ostanejo nižji.
+        // Na desktopu (sm+) ostane fiksna višina kot prej.
+        "h-auto sm:min-h-0",
+        day.isCurrentMonth
+          ? large
+            ? "min-h-[4.5rem]"
+            : "min-h-[4rem]"
+          : "min-h-[3.25rem]",
+        large ? "sm:h-36" : "sm:h-24",
         day.isCurrentMonth
           ? clientColor
             ? "border-2 bg-white hover:brightness-95 dark:bg-gray-900 dark:hover:brightness-110"
