@@ -9,7 +9,7 @@ import ThemeToggle from "@/components/theme/ThemeToggle";
 
 const LINKS = [
   { href: "/", label: "Koledar" },
-  { href: "/stranke", label: "Stranke" },
+  { href: "/partnerji", label: "Partnerji" },
   { href: "/projekti", label: "Projekti" },
 ];
 

@@ -9,8 +9,8 @@ const rubik = Rubik({
 });
 
 export const metadata: Metadata = {
-  title: "Posel — Stranke in koledar",
-  description: "Pregled strank in delovnega urnika na enem mestu.",
+  title: "Posel — Partnerji in koledar",
+  description: "Pregled partnerjev in delovnega urnika na enem mestu.",
   icons: {
     icon: [{ url: "/icons/icon.svg", type: "image/svg+xml" }],
     shortcut: "/icons/icon.svg",

@@ -14,7 +14,7 @@ export type WorkEntryInput = {
 export type WorkEntryActionResult = { error?: string };
 
 function validate(input: WorkEntryInput): string | null {
-  if (!input.client_id) return "Izberi stranko.";
+  if (!input.client_id) return "Izberi partnerja.";
   if (!input.work_date) return "Manjka datum.";
   if (input.start_time && input.end_time && input.end_time <= input.start_time) {
     return "Čas konca mora biti za časom začetka.";

@@ -15,7 +15,7 @@ export default function DeleteClientButton({ clientId }: { clientId: string }) {
       onClick={() => {
         if (
           !confirm(
-            "Izbriši to stranko? S tem se izbrišejo tudi vsi njeni delovni vnosi v koledarju in vsi njeni projekti v zavihku Projekti."
+            "Izbriši tega partnerja? S tem se izbrišejo tudi vsi njegovi delovni vnosi v koledarju in vsi njegovi projekti v zavihku Projekti."
           )
         ) {
           return;
@@ -25,7 +25,7 @@ export default function DeleteClientButton({ clientId }: { clientId: string }) {
         });
       }}
     >
-      {pending ? "Brišem …" : "Izbriši stranko"}
+      {pending ? "Brišem …" : "Izbriši partnerja"}
     </Button>
   );
 }

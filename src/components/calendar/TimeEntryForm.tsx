@@ -60,14 +60,14 @@ export default function TimeEntryForm({
   if (clients.length === 0) {
     return (
       <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:bg-amber-950 dark:text-amber-300">
-        Najprej dodaj vsaj eno stranko v zavihku &quot;Stranke&quot;.
+        Najprej dodaj vsaj enega partnerja v zavihku &quot;Partnerji&quot;.
       </p>
     );
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3 rounded-md border border-gray-200 p-3 dark:border-gray-800">
-      <Field label="Stranka" htmlFor="client_id">
+      <Field label="Partner" htmlFor="client_id">
         <select
           id="client_id"
           value={clientId}
