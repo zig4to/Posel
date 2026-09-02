@@ -17,6 +17,8 @@ const GAP = 8;
 const PADDING = 20;
 const HEADER_HEIGHT = 30;
 const TITLE_HEIGHT = 40;
+const LEGEND_HEIGHT = 40;
+const LEGEND_SAMPLE_COLOR = "#3B82F6";
 
 type ExportTheme = "light" | "dark";
 
@@ -113,7 +115,13 @@ function drawCalendar(
   const colors = THEME_COLORS[theme];
   const rows = 6;
   const width = PADDING * 2 + 7 * CELL_SIZE + 6 * GAP;
-  const height = PADDING * 2 + TITLE_HEIGHT + HEADER_HEIGHT + rows * CELL_SIZE + (rows - 1) * GAP;
+  const height =
+    PADDING * 2 +
+    TITLE_HEIGHT +
+    HEADER_HEIGHT +
+    rows * CELL_SIZE +
+    (rows - 1) * GAP +
+    LEGEND_HEIGHT;
 
   // Slikovni buffer ostane v polni ločljivosti (za oster prenos PNG), prikaz
   // (CSS širina/višina) pa je manjši - nadzorujejo ga razredi na <canvas>.
@@ -173,13 +181,46 @@ function drawCalendar(
     ctx.textAlign = "left";
     ctx.fillText(String(day.date.getDate()), x + 10, y + 22);
   });
+
+  // Legenda: obarvani dnevi = zasedeni, neobarvani = prosti.
+  const legendY = gridTop + rows * CELL_SIZE + (rows - 1) * GAP + 26;
+  const swatch = 14;
+  ctx.font = "500 13px system-ui, sans-serif";
+  ctx.textAlign = "left";
+
+  let lx = PADDING;
+  roundedRectPath(ctx, lx, legendY - swatch + 3, swatch, swatch, 3);
+  ctx.fillStyle = `${LEGEND_SAMPLE_COLOR}26`;
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = LEGEND_SAMPLE_COLOR;
+  ctx.stroke();
+  ctx.fillStyle = colors.dayNumber;
+  ctx.fillText("Obarvani dnevi = zasedeni", lx + swatch + 8, legendY);
+
+  lx = PADDING + 230;
+  roundedRectPath(ctx, lx, legendY - swatch + 3, swatch, swatch, 3);
+  ctx.fillStyle = colors.emptyFill;
+  ctx.fill();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = colors.emptyBorder;
+  ctx.stroke();
+  ctx.fillStyle = colors.dayNumber;
+  ctx.fillText("Neobarvani = prosti", lx + swatch + 8, legendY);
 }
 
 export default function CalendarSnapshot() {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
-  const [exportTheme, setExportTheme] = useState<ExportTheme>("light");
+  // Privzeto sledi trenutni (razrešeni) temi aplikacije - ThemeScript nastavi
+  // data-theme na <html> še pred hidracijo, zato je vrednost tu že na voljo.
+  const [exportTheme, setExportTheme] = useState<ExportTheme>(() =>
+    typeof document !== "undefined" &&
+    document.documentElement.getAttribute("data-theme") === "dark"
+      ? "dark"
+      : "light"
+  );
   const [loading, setLoading] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [shareSupported, setShareSupported] = useState(false);
