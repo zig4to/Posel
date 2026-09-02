@@ -18,6 +18,54 @@ const PADDING = 20;
 const HEADER_HEIGHT = 30;
 const TITLE_HEIGHT = 40;
 
+type ExportTheme = "light" | "dark";
+
+const THEME_COLORS: Record<
+  ExportTheme,
+  {
+    background: string;
+    title: string;
+    weekday: string;
+    dayNumber: string;
+    emptyFill: string;
+    emptyBorder: string;
+  }
+> = {
+  light: {
+    background: "#ffffff",
+    title: "#111827",
+    weekday: "#6b7280",
+    dayNumber: "#111827",
+    emptyFill: "#ffffff",
+    emptyBorder: "#d1d5db",
+  },
+  dark: {
+    background: "#111827",
+    title: "#f3f4f6",
+    weekday: "#9ca3af",
+    dayNumber: "#f3f4f6",
+    emptyFill: "#111827",
+    emptyBorder: "#374151",
+  },
+};
+
+function SunIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+      <circle cx="12" cy="12" r="4" />
+      <path strokeLinecap="round" d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+    </svg>
+  );
+}
+
+function MoonIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" />
+    </svg>
+  );
+}
+
 function roundedRectPath(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -39,27 +87,28 @@ function drawCalendar(
   canvas: HTMLCanvasElement,
   year: number,
   month: number,
-  dayColors: Map<string, string>
+  dayColors: Map<string, string>,
+  theme: ExportTheme
 ) {
+  const colors = THEME_COLORS[theme];
   const rows = 6;
   const width = PADDING * 2 + 7 * CELL_SIZE + 6 * GAP;
   const height = PADDING * 2 + TITLE_HEIGHT + HEADER_HEIGHT + rows * CELL_SIZE + (rows - 1) * GAP;
 
-  // Ostrejši izris na zaslonih z visoko gostoto pik (devicePixelRatio).
+  // Slikovni buffer ostane v polni ločljivosti (za oster prenos PNG), prikaz
+  // (CSS širina/višina) pa je manjši - nadzorujejo ga razredi na <canvas>.
   const dpr = window.devicePixelRatio || 1;
   canvas.width = width * dpr;
   canvas.height = height * dpr;
-  canvas.style.width = `${width}px`;
-  canvas.style.height = `${height}px`;
 
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
   ctx.scale(dpr, dpr);
 
-  ctx.fillStyle = "#ffffff";
+  ctx.fillStyle = colors.background;
   ctx.fillRect(0, 0, width, height);
 
-  ctx.fillStyle = "#111827";
+  ctx.fillStyle = colors.title;
   ctx.font = "700 20px system-ui, sans-serif";
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
@@ -67,7 +116,7 @@ function drawCalendar(
 
   const headerTop = PADDING + TITLE_HEIGHT;
   ctx.font = "600 12px system-ui, sans-serif";
-  ctx.fillStyle = "#6b7280";
+  ctx.fillStyle = colors.weekday;
   ctx.textAlign = "center";
   SLOVENIAN_WEEKDAYS_SHORT.forEach((wd, i) => {
     const x = PADDING + i * (CELL_SIZE + GAP) + CELL_SIZE / 2;
@@ -92,14 +141,14 @@ function drawCalendar(
       ctx.lineWidth = 3;
       ctx.strokeStyle = color;
     } else {
-      ctx.fillStyle = "#ffffff";
+      ctx.fillStyle = colors.emptyFill;
       ctx.fill();
       ctx.lineWidth = 1;
-      ctx.strokeStyle = "#d1d5db";
+      ctx.strokeStyle = colors.emptyBorder;
     }
     ctx.stroke();
 
-    ctx.fillStyle = "#111827";
+    ctx.fillStyle = colors.dayNumber;
     ctx.font = "600 14px system-ui, sans-serif";
     ctx.textAlign = "left";
     ctx.fillText(String(day.date.getDate()), x + 10, y + 22);
@@ -110,6 +159,7 @@ export default function CalendarSnapshot() {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
+  const [exportTheme, setExportTheme] = useState<ExportTheme>("light");
   const [loading, setLoading] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -125,12 +175,12 @@ export default function CalendarSnapshot() {
         dayColors.set(entry.work_date, entry.clients.color);
       }
       if (canvasRef.current) {
-        drawCalendar(canvasRef.current, year, month, dayColors);
+        drawCalendar(canvasRef.current, year, month, dayColors, exportTheme);
       }
     } finally {
       setLoading(false);
     }
-  }, [year, month]);
+  }, [year, month, exportTheme]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -153,16 +203,29 @@ export default function CalendarSnapshot() {
 
   return (
     <div className="space-y-3">
-      <MonthYearPicker
-        year={year}
-        month={month}
-        onChange={(y, m) => {
-          setYear(y);
-          setMonth(m);
-        }}
-      />
-      <div className="overflow-x-auto rounded-md border border-gray-200 p-2 dark:border-gray-800">
-        <canvas ref={canvasRef} className="block" />
+      <div className="flex items-center gap-2">
+        <MonthYearPicker
+          year={year}
+          month={month}
+          onChange={(y, m) => {
+            setYear(y);
+            setMonth(m);
+          }}
+        />
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => setExportTheme((t) => (t === "light" ? "dark" : "light"))}
+          aria-label={
+            exportTheme === "light" ? "Preklopi na temno izvozno temo" : "Preklopi na svetlo izvozno temo"
+          }
+          title={exportTheme === "light" ? "Svetla tema izvoza" : "Temna tema izvoza"}
+        >
+          {exportTheme === "light" ? <SunIcon /> : <MoonIcon />}
+        </Button>
+      </div>
+      <div className="flex justify-center rounded-md border border-gray-200 p-2 dark:border-gray-800">
+        <canvas ref={canvasRef} className="block h-auto w-full max-w-xs" />
       </div>
       <Button type="button" onClick={handleDownload} disabled={loading}>
         {loading ? "Nalagam …" : "Prenesi sliko"}
