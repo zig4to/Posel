@@ -2,6 +2,11 @@
 // Če imaš nameščen Supabase CLI, jih lahko kasneje nadomestiš z generiranimi:
 //   supabase gen types typescript --project-id <id> > src/lib/types/database.types.ts
 
+export type CostItem = {
+  amount: number;
+  note: string | null;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -102,8 +107,9 @@ export type Database = {
           id: string;
           user_id: string;
           client_id: string;
+          name: string;
           work_dates: string[];
-          costs: number;
+          cost_items: CostItem[];
           revenue: number;
           note: string | null;
           created_at: string;
@@ -113,8 +119,9 @@ export type Database = {
           id?: string;
           user_id?: string;
           client_id: string;
+          name: string;
           work_dates: string[];
-          costs?: number;
+          cost_items?: CostItem[];
           revenue?: number;
           note?: string | null;
           created_at?: string;
@@ -124,10 +131,41 @@ export type Database = {
           id?: string;
           user_id?: string;
           client_id?: string;
+          name?: string;
           work_dates?: string[];
-          costs?: number;
+          cost_items?: CostItem[];
           revenue?: number;
           note?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      monthly_taxes: {
+        Relationships: [];
+        Row: {
+          id: string;
+          user_id: string;
+          year: number;
+          month: number;
+          amount: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          year: number;
+          month: number;
+          amount?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          year?: number;
+          month?: number;
+          amount?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -163,3 +201,9 @@ export type ProjectUpdate =
 export type ProjectWithClient = Project & {
   clients: Pick<Client, "id" | "company_name" | "color"> | null;
 };
+
+export type MonthlyTax = Database["public"]["Tables"]["monthly_taxes"]["Row"];
+export type MonthlyTaxInsert =
+  Database["public"]["Tables"]["monthly_taxes"]["Insert"];
+export type MonthlyTaxUpdate =
+  Database["public"]["Tables"]["monthly_taxes"]["Update"];

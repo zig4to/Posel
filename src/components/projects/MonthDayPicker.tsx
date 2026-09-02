@@ -36,6 +36,7 @@ export default function MonthDayPicker({
 
   const [rangeFrom, setRangeFrom] = useState(1);
   const [rangeTo, setRangeTo] = useState(daysInMonth);
+  const [showRangeForm, setShowRangeForm] = useState(false);
 
   function dateKeyForDay(day: number): string {
     return formatDateKey(new Date(year, month, day));
@@ -93,51 +94,61 @@ export default function MonthDayPicker({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-end gap-2">
-        <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
-            Od dneva
-          </label>
-          <select
-            value={rangeFrom}
-            onChange={(e) => setRangeFrom(Number(e.target.value))}
-            className="rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:[color-scheme:dark]"
+      {showRangeForm ? (
+        <div className="flex flex-wrap items-end gap-2">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
+              Od dneva
+            </label>
+            <select
+              value={rangeFrom}
+              onChange={(e) => setRangeFrom(Number(e.target.value))}
+              className="rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:[color-scheme:dark]"
+            >
+              {days.map((day) => (
+                <option key={day} value={day}>
+                  {day}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
+              Do dneva
+            </label>
+            <select
+              value={rangeTo}
+              onChange={(e) => setRangeTo(Number(e.target.value))}
+              className="rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:[color-scheme:dark]"
+            >
+              {days.map((day) => (
+                <option key={day} value={day}>
+                  {day}
+                </option>
+              ))}
+            </select>
+          </div>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => {
+              const from = Math.min(rangeFrom, rangeTo);
+              const to = Math.max(rangeFrom, rangeTo);
+              onAddRange(dateKeyForDay(from), dateKeyForDay(to));
+              setShowRangeForm(false);
+            }}
           >
-            {days.map((day) => (
-              <option key={day} value={day}>
-                {day}
-              </option>
-            ))}
-          </select>
+            Potrdi
+          </Button>
+          <Button type="button" variant="ghost" onClick={() => setShowRangeForm(false)}>
+            Prekliči
+          </Button>
         </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
-            Do dneva
-          </label>
-          <select
-            value={rangeTo}
-            onChange={(e) => setRangeTo(Number(e.target.value))}
-            className="rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:[color-scheme:dark]"
-          >
-            {days.map((day) => (
-              <option key={day} value={day}>
-                {day}
-              </option>
-            ))}
-          </select>
-        </div>
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={() => {
-            const from = Math.min(rangeFrom, rangeTo);
-            const to = Math.max(rangeFrom, rangeTo);
-            onAddRange(dateKeyForDay(from), dateKeyForDay(to));
-          }}
-        >
-          Dodaj razpon
+      ) : (
+        <Button type="button" variant="secondary" onClick={() => setShowRangeForm(true)}>
+          Razpon
         </Button>
-      </div>
+      )}
     </div>
   );
 }

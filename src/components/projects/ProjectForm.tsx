@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import type {
   Client,
+  CostItem,
   ProjectWithClient,
   WorkEntryWithClient,
 } from "@/lib/types/database.types";
@@ -25,6 +27,18 @@ type ProjectFormProps = {
   project?: ProjectWithClient; // če je podan, gre za urejanje
 };
 
+type CostItemFields = { amount: string; note: string };
+
+function initialCostItems(project?: ProjectWithClient): CostItemFields[] {
+  if (project && (project.cost_items ?? []).length > 0) {
+    return project.cost_items.map((item) => ({
+      amount: String(item.amount),
+      note: item.note ?? "",
+    }));
+  }
+  return [{ amount: "", note: "" }];
+}
+
 function initialMonth(project?: ProjectWithClient): { year: number; month: number } {
   if (project && project.work_dates.length > 0) {
     const [year, month] = project.work_dates[0].split("-").map(Number);
@@ -35,6 +49,8 @@ function initialMonth(project?: ProjectWithClient): { year: number; month: numbe
 }
 
 export default function ProjectForm({ clients, project }: ProjectFormProps) {
+  const router = useRouter();
+  const [name, setName] = useState(project?.name ?? "");
   const [clientId, setClientId] = useState(
     project?.client_id ?? clients[0]?.id ?? ""
   );
@@ -42,8 +58,8 @@ export default function ProjectForm({ clients, project }: ProjectFormProps) {
   const [selectedDates, setSelectedDates] = useState<Set<string>>(
     () => new Set(project?.work_dates ?? [])
   );
-  const [costItems, setCostItems] = useState<string[]>(
-    project ? [String(project.costs)] : [""]
+  const [costItems, setCostItems] = useState<CostItemFields[]>(() =>
+    initialCostItems(project)
   );
   const [revenue, setRevenue] = useState(project ? String(project.revenue) : "");
   const [note, setNote] = useState(project?.note ?? "");
@@ -78,8 +94,19 @@ export default function ProjectForm({ clients, project }: ProjectFormProps) {
     return map;
   }, [monthEntries]);
 
+  // dateKey -> client_id, da ob izbiri dneva z vnosom v koledarju samodejno
+  // izberemo pravo stranko v obrazcu.
+  const dayClientIds = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const entry of monthEntries) {
+      if (map.has(entry.work_date)) continue;
+      map.set(entry.work_date, entry.client_id);
+    }
+    return map;
+  }, [monthEntries]);
+
   const totalCosts = useMemo(
-    () => costItems.reduce((sum, v) => sum + (Number(v) || 0), 0),
+    () => costItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0),
     [costItems]
   );
 
@@ -88,12 +115,20 @@ export default function ProjectForm({ clients, project }: ProjectFormProps) {
     return revenueNum - totalCosts;
   }, [revenue, totalCosts]);
 
-  function updateCostItem(index: number, value: string) {
-    setCostItems((prev) => prev.map((v, i) => (i === index ? value : v)));
+  function updateCostAmount(index: number, value: string) {
+    setCostItems((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, amount: value } : item))
+    );
+  }
+
+  function updateCostNote(index: number, value: string) {
+    setCostItems((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, note: value } : item))
+    );
   }
 
   function addCostItem() {
-    setCostItems((prev) => [...prev, ""]);
+    setCostItems((prev) => [...prev, { amount: "", note: "" }]);
   }
 
   function removeCostItem(index: number) {
@@ -111,6 +146,12 @@ export default function ProjectForm({ clients, project }: ProjectFormProps) {
   }
 
   function toggleDay(dateKey: string) {
+    const isAdding = !selectedDates.has(dateKey);
+    if (isAdding) {
+      const entryClientId = dayClientIds.get(dateKey);
+      if (entryClientId) setClientId(entryClientId);
+    }
+
     setSelectedDates((prev) => {
       const next = new Set(prev);
       if (next.has(dateKey)) {
@@ -123,6 +164,22 @@ export default function ProjectForm({ clients, project }: ProjectFormProps) {
   }
 
   function addRange(fromKey: string, toKey: string) {
+    // Če ima kateri od dni v razponu vnos v koledarju, samodejno izberemo
+    // pripadajočo stranko (prvi tak dan v razponu).
+    let cursor = new Date(fromKey);
+    const end = new Date(toKey);
+    while (cursor <= end) {
+      const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-${String(
+        cursor.getDate()
+      ).padStart(2, "0")}`;
+      const entryClientId = dayClientIds.get(key);
+      if (entryClientId) {
+        setClientId(entryClientId);
+        break;
+      }
+      cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 1);
+    }
+
     setSelectedDates((prev) => {
       const next = new Set(prev);
       let cursor = new Date(fromKey);
@@ -143,10 +200,16 @@ export default function ProjectForm({ clients, project }: ProjectFormProps) {
     e.preventDefault();
     setError(null);
 
+    const cost_items: CostItem[] = costItems.map((item) => ({
+      amount: Number(item.amount) || 0,
+      note: item.note.trim() || null,
+    }));
+
     const input: ProjectInput = {
+      name: name.trim(),
       client_id: clientId,
       work_dates: [...selectedDates],
-      costs: totalCosts,
+      cost_items,
       revenue: Number(revenue) || 0,
       note: note.trim() || null,
     };
@@ -165,14 +228,23 @@ export default function ProjectForm({ clients, project }: ProjectFormProps) {
   if (clients.length === 0) {
     return (
       <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:bg-amber-950 dark:text-amber-300">
-        Najprej dodaj vsaj eno stranko v zavihku &quot;Stranke&quot;.
+        Najprej dodaj vsaj enega partnerja v zavihku &quot;Partnerji&quot;.
       </p>
     );
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <Field label="Stranka" htmlFor="client_id">
+      <Field label="Ime projekta *" htmlFor="name">
+        <Input
+          id="name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+        />
+      </Field>
+
+      <Field label="Partner" htmlFor="client_id">
         <select
           id="client_id"
           value={clientId}
@@ -206,60 +278,65 @@ export default function ProjectForm({ clients, project }: ProjectFormProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Stroški (EUR)" htmlFor="costs-0">
-          <div className="space-y-2">
-            {costItems.map((value, index) => {
-              const isLast = index === costItems.length - 1;
-              return (
-                <div key={index} className="flex items-center gap-2">
-                  <div className="w-24">
-                    <Input
-                      id={`costs-${index}`}
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={value}
-                      onChange={(e) => updateCostItem(index, e.target.value)}
-                    />
-                  </div>
-                  {isLast ? (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      className="h-9 w-9 flex-shrink-0 px-0"
-                      onClick={addCostItem}
-                      aria-label="Dodaj strošek"
-                    >
-                      +
-                    </Button>
-                  ) : (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="h-9 w-9 flex-shrink-0 px-0"
-                      onClick={() => removeCostItem(index)}
-                      aria-label="Odstrani strošek"
-                    >
-                      ×
-                    </Button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </Field>
-        <Field label="Priliv (EUR)" htmlFor="revenue">
-          <Input
-            id="revenue"
-            type="number"
-            step="0.01"
-            min="0"
-            value={revenue}
-            onChange={(e) => setRevenue(e.target.value)}
-          />
-        </Field>
-      </div>
+      <Field label="Stroški (EUR)" htmlFor="cost-amount-0">
+        <div className="space-y-2">
+          {costItems.map((item, index) => (
+            <div key={index} className="flex items-center gap-2">
+              <div className="w-24 flex-shrink-0">
+                <Input
+                  id={`cost-amount-${index}`}
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="Znesek"
+                  value={item.amount}
+                  onChange={(e) => updateCostAmount(index, e.target.value)}
+                />
+              </div>
+              <div className="min-w-0 flex-1">
+                <Input
+                  id={`cost-note-${index}`}
+                  placeholder="Opomba"
+                  value={item.note}
+                  onChange={(e) => updateCostNote(index, e.target.value)}
+                />
+              </div>
+              {index === costItems.length - 1 ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="h-9 w-9 flex-shrink-0 px-0"
+                  onClick={addCostItem}
+                  aria-label="Dodaj strošek"
+                >
+                  +
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-9 w-9 flex-shrink-0 px-0"
+                  onClick={() => removeCostItem(index)}
+                  aria-label="Odstrani strošek"
+                >
+                  ×
+                </Button>
+              )}
+            </div>
+          ))}
+        </div>
+      </Field>
+
+      <Field label="Priliv (EUR)" htmlFor="revenue">
+        <Input
+          id="revenue"
+          type="number"
+          step="0.01"
+          min="0"
+          value={revenue}
+          onChange={(e) => setRevenue(e.target.value)}
+        />
+      </Field>
 
       <p className="text-sm text-gray-600 dark:text-gray-400">
         Dobiček:{" "}
@@ -279,9 +356,19 @@ export default function ProjectForm({ clients, project }: ProjectFormProps) {
 
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
-      <Button type="submit" disabled={pending}>
-        {pending ? "Shranjujem …" : project ? "Shrani spremembe" : "Dodaj projekt"}
-      </Button>
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          variant="danger"
+          disabled={pending}
+          onClick={() => router.back()}
+        >
+          Prekliči
+        </Button>
+        <Button type="submit" disabled={pending}>
+          {pending ? "Shranjujem …" : project ? "Shrani spremembe" : "Dodaj projekt"}
+        </Button>
+      </div>
     </form>
   );
 }

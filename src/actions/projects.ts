@@ -3,11 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import type { CostItem } from "@/lib/types/database.types";
 
 export type ProjectInput = {
+  name: string;
   client_id: string;
   work_dates: string[];
-  costs: number;
+  cost_items: CostItem[];
   revenue: number;
   note: string | null;
 };
@@ -18,10 +20,19 @@ function normalizeDates(dates: string[]): string[] {
   return [...new Set(dates)].sort();
 }
 
+// Odstrani prazne postavke (brez zneska in brez opombe), ki jih je uporabnik
+// pustil neizpolnjene po kliku na "+".
+function cleanCostItems(items: CostItem[]): CostItem[] {
+  return items.filter((item) => item.amount > 0 || (item.note && item.note.trim()));
+}
+
 function validate(input: ProjectInput): string | null {
-  if (!input.client_id) return "Izberi stranko.";
+  if (!input.name.trim()) return "Vnesi ime projekta.";
+  if (!input.client_id) return "Izberi partnerja.";
   if (input.work_dates.length === 0) return "Izberi vsaj en dan.";
-  if (input.costs < 0) return "Stroški ne smejo biti negativni.";
+  if (input.cost_items.some((item) => item.amount < 0)) {
+    return "Stroški ne smejo biti negativni.";
+  }
   if (input.revenue < 0) return "Priliv ne sme biti negativen.";
 
   const dates = normalizeDates(input.work_dates);
@@ -42,9 +53,10 @@ export async function createProjectAction(
 
   const supabase = await createClient();
   const { error } = await supabase.from("projects").insert({
+    name: input.name.trim(),
     client_id: input.client_id,
     work_dates: normalizeDates(input.work_dates),
-    costs: input.costs,
+    cost_items: cleanCostItems(input.cost_items),
     revenue: input.revenue,
     note: input.note,
   });
@@ -68,9 +80,10 @@ export async function updateProjectAction(
   const { error } = await supabase
     .from("projects")
     .update({
+      name: input.name.trim(),
       client_id: input.client_id,
       work_dates: normalizeDates(input.work_dates),
-      costs: input.costs,
+      cost_items: cleanCostItems(input.cost_items),
       revenue: input.revenue,
       note: input.note,
     })
