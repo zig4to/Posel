@@ -15,7 +15,7 @@ export default function DeleteClientButton({ clientId }: { clientId: string }) {
       onClick={() => {
         if (
           !confirm(
-            "Izbriši to stranko? S tem se izbrišejo tudi vsi njeni delovni vnosi v koledarju."
+            "Izbriši to stranko? S tem se izbrišejo tudi vsi njeni delovni vnosi v koledarju in vsi njeni projekti v zavihku Projekti."
           )
         ) {
           return;

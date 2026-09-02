@@ -88,6 +88,50 @@ export type Database = {
           updated_at?: string;
         };
       };
+      projects: {
+        Relationships: [
+          {
+            foreignKeyName: "projects_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["id"];
+          }
+        ];
+        Row: {
+          id: string;
+          user_id: string;
+          client_id: string;
+          work_dates: string[];
+          costs: number;
+          revenue: number;
+          note: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          client_id: string;
+          work_dates: string[];
+          costs?: number;
+          revenue?: number;
+          note?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          client_id?: string;
+          work_dates?: string[];
+          costs?: number;
+          revenue?: number;
+          note?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -107,5 +151,15 @@ export type WorkEntryUpdate =
   Database["public"]["Tables"]["work_entries"]["Update"];
 
 export type WorkEntryWithClient = WorkEntry & {
+  clients: Pick<Client, "id" | "company_name" | "color"> | null;
+};
+
+export type Project = Database["public"]["Tables"]["projects"]["Row"];
+export type ProjectInsert =
+  Database["public"]["Tables"]["projects"]["Insert"];
+export type ProjectUpdate =
+  Database["public"]["Tables"]["projects"]["Update"];
+
+export type ProjectWithClient = Project & {
   clients: Pick<Client, "id" | "company_name" | "color"> | null;
 };

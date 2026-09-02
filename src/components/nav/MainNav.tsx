@@ -10,6 +10,7 @@ import ThemeToggle from "@/components/theme/ThemeToggle";
 const LINKS = [
   { href: "/", label: "Koledar" },
   { href: "/stranke", label: "Stranke" },
+  { href: "/projekti", label: "Projekti" },
 ];
 
 function UserIcon() {
