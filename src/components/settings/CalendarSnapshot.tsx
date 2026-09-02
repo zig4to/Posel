@@ -196,7 +196,7 @@ function drawCalendar(
   ctx.strokeStyle = LEGEND_SAMPLE_COLOR;
   ctx.stroke();
   ctx.fillStyle = colors.dayNumber;
-  ctx.fillText("Obarvani dnevi = zasedeni", lx + swatch + 8, legendY);
+  ctx.fillText("Obarvani dnevi = zaseden", lx + swatch + 8, legendY);
 
   lx = PADDING + 230;
   roundedRectPath(ctx, lx, legendY - swatch + 3, swatch, swatch, 3);
@@ -206,7 +206,7 @@ function drawCalendar(
   ctx.strokeStyle = colors.emptyBorder;
   ctx.stroke();
   ctx.fillStyle = colors.dayNumber;
-  ctx.fillText("Neobarvani = prosti", lx + swatch + 8, legendY);
+  ctx.fillText("Neobarvani = prost", lx + swatch + 8, legendY);
 }
 
 export default function CalendarSnapshot() {
