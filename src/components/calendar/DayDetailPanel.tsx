@@ -66,7 +66,7 @@ export default function DayDetailPanel({
                     <div className="flex items-center gap-1.5 text-sm font-medium text-gray-900 dark:text-gray-100">
                       <ColorDot color={entry.clients?.color ?? "#999"} />
                       <span className="min-w-0 truncate">
-                        {entry.clients?.company_name ?? "Neznana stranka"}
+                        {entry.clients?.company_name ?? "Neznan partner"}
                       </span>
                     </div>
                     <p className="break-words text-xs text-gray-500 dark:text-gray-400">

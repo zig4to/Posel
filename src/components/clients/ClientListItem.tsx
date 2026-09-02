@@ -5,7 +5,7 @@ import { ColorDot } from "@/components/ui/Badge";
 export default function ClientListItem({ client }: { client: Client }) {
   return (
     <Link
-      href={`/stranke/${client.id}`}
+      href={`/partnerji/${client.id}`}
       className="flex items-center gap-3 rounded-md border border-gray-200 bg-white px-4 py-3 hover:border-gray-300 hover:shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700 dark:hover:shadow-black/40"
     >
       <ColorDot color={client.color} className="h-3 w-3 flex-shrink-0" />

@@ -4,9 +4,9 @@ import type { MetadataRoute } from "next";
 // <link rel="manifest">. Ikone generira tools/make-icons.js (npm run icons).
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Posel — Stranke in koledar",
+    name: "Posel — Partnerji in koledar",
     short_name: "Posel",
-    description: "Pregled strank in delovnega urnika na enem mestu.",
+    description: "Pregled partnerjev in delovnega urnika na enem mestu.",
     start_url: "/",
     scope: "/",
     display: "standalone",

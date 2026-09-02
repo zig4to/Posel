@@ -46,12 +46,12 @@ export async function createClientAction(
   });
 
   if (error) {
-    return { error: "Napaka pri shranjevanju stranke: " + error.message };
+    return { error: "Napaka pri shranjevanju partnerja: " + error.message };
   }
 
-  revalidatePath("/stranke");
+  revalidatePath("/partnerji");
   revalidatePath("/");
-  redirect("/stranke");
+  redirect("/partnerji");
 }
 
 export async function updateClientAction(
@@ -72,13 +72,13 @@ export async function updateClientAction(
     .eq("id", id);
 
   if (error) {
-    return { error: "Napaka pri posodabljanju stranke: " + error.message };
+    return { error: "Napaka pri posodabljanju partnerja: " + error.message };
   }
 
-  revalidatePath("/stranke");
-  revalidatePath(`/stranke/${id}`);
+  revalidatePath("/partnerji");
+  revalidatePath(`/partnerji/${id}`);
   revalidatePath("/");
-  redirect(`/stranke/${id}`);
+  redirect(`/partnerji/${id}`);
 }
 
 export async function deleteClientAction(id: string) {
@@ -86,10 +86,10 @@ export async function deleteClientAction(id: string) {
   const { error } = await supabase.from("clients").delete().eq("id", id);
 
   if (error) {
-    throw new Error("Napaka pri brisanju stranke: " + error.message);
+    throw new Error("Napaka pri brisanju partnerja: " + error.message);
   }
 
-  revalidatePath("/stranke");
+  revalidatePath("/partnerji");
   revalidatePath("/");
-  redirect("/stranke");
+  redirect("/partnerji");
 }

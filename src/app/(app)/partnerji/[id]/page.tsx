@@ -13,7 +13,7 @@ const FIELDS: Array<{ key: "contact_person" | "phone" | "email" | "address"; lab
   { key: "address", label: "Naslov" },
 ];
 
-export default async function StrankaDetailPage({
+export default async function PartnerDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
@@ -37,7 +37,7 @@ export default async function StrankaDetailPage({
             {client.company_name}
           </h1>
         </div>
-        <Link href={`/stranke/${client.id}/uredi`} className="flex-shrink-0">
+        <Link href={`/partnerji/${client.id}/uredi`} className="flex-shrink-0">
           <Button variant="secondary">Uredi</Button>
         </Link>
       </div>
@@ -57,7 +57,7 @@ export default async function StrankaDetailPage({
 
       <div className="mt-4 flex justify-between">
         <Link
-          href="/stranke"
+          href="/partnerji"
           className="text-sm text-gray-500 hover:underline dark:text-gray-400"
         >
           ← Nazaj na seznam

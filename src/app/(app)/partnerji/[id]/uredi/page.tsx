@@ -4,7 +4,7 @@ import { getClientById } from "@/lib/data/clients";
 import ClientForm from "@/components/clients/ClientForm";
 import { updateClientAction } from "@/actions/clients";
 
-export default async function UrediStrankoPage({
+export default async function UrediPartnerjaPage({
   params,
 }: {
   params: Promise<{ id: string }>;
@@ -24,7 +24,7 @@ export default async function UrediStrankoPage({
   return (
     <div className="mx-auto max-w-lg">
       <h1 className="mb-4 text-xl font-semibold text-gray-900 dark:text-gray-100">
-        Uredi stranko
+        Uredi partnerja
       </h1>
       <div className="rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
         <ClientForm

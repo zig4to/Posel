@@ -16,7 +16,7 @@ type FilterMenuProps = {
   onDateChange: (year: number, month: number) => void;
 };
 
-type Section = "stranke" | "datum";
+type Section = "partnerji" | "datum";
 
 const YEAR_RANGE = 5;
 
@@ -72,7 +72,7 @@ function ChevronLeftIcon() {
 }
 
 const SECTION_LABEL: Record<Section, string> = {
-  stranke: "Filtriraj po strankah",
+  partnerji: "Filtriraj po partnerjih",
   datum: "Filtriraj po datumu",
 };
 
@@ -85,7 +85,7 @@ export default function FilterMenu({
   onDateChange,
 }: FilterMenuProps) {
   const [open, setOpen] = useState(false);
-  const [section, setSection] = useState<Section>("stranke");
+  const [section, setSection] = useState<Section>("partnerji");
   // Samo za mobilni "drill-down" meni: null = seznam kategorij filtra,
   // sicer izbrana kategorija (vsebina te kategorije je enaka kot na desktopu).
   const [mobileSection, setMobileSection] = useState<Section | null>(null);
@@ -165,11 +165,11 @@ export default function FilterMenu({
             : "text-gray-700 dark:text-gray-200"
         )}
       >
-        Vse stranke
+        Vsi partnerji
       </button>
       {clients.length === 0 && (
         <p className="px-3 py-2 text-sm text-gray-400 dark:text-gray-500">
-          Ni strank.
+          Ni partnerjev.
         </p>
       )}
       {clients.map((client) => (
@@ -277,7 +277,7 @@ export default function FilterMenu({
                 </button>
               ))}
             </div>
-            {section === "stranke" ? clientListContent : dateContent}
+            {section === "partnerji" ? clientListContent : dateContent}
           </div>
 
           {/* Mobile: najprej seznam kategorij, šele ob kliku se odpre izbira. */}
@@ -306,7 +306,7 @@ export default function FilterMenu({
                   <ChevronLeftIcon />
                   {SECTION_LABEL[mobileSection]}
                 </button>
-                {mobileSection === "stranke" ? clientListContent : dateContent}
+                {mobileSection === "partnerji" ? clientListContent : dateContent}
               </div>
             )}
           </div>
