@@ -27,3 +27,12 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Na desktopu (sm+) je vsa postavitev (rem-based Tailwind razredi: pisava,
+   presledki, velikosti) povečana za 10%, kot bi uporabnik povečal stran
+   na 110% namesto 100%. Mobilni pogled ostane nespremenjen. */
+@media (min-width: 640px) {
+  html {
+    font-size: 110%;
+  }
+}
