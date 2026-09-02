@@ -66,6 +66,26 @@ function MoonIcon() {
   );
 }
 
+function ShareIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-4 w-4"
+    >
+      <circle cx="18" cy="5" r="3" />
+      <circle cx="6" cy="12" r="3" />
+      <circle cx="18" cy="19" r="3" />
+      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+      <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+    </svg>
+  );
+}
+
 function roundedRectPath(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -161,7 +181,16 @@ export default function CalendarSnapshot() {
   const [month, setMonth] = useState(now.getMonth());
   const [exportTheme, setExportTheme] = useState<ExportTheme>("light");
   const [loading, setLoading] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const [shareSupported, setShareSupported] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !navigator.canShare) return;
+    const testFile = new File([], "test.png", { type: "image/png" });
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setShareSupported(navigator.canShare({ files: [testFile] }));
+  }, []);
 
   const generate = useCallback(async () => {
     setLoading(true);
@@ -187,6 +216,10 @@ export default function CalendarSnapshot() {
     generate();
   }, [generate]);
 
+  function fileName() {
+    return `koledar-${year}-${String(month + 1).padStart(2, "0")}.png`;
+  }
+
   function handleDownload() {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -195,9 +228,29 @@ export default function CalendarSnapshot() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `koledar-${year}-${String(month + 1).padStart(2, "0")}.png`;
+      a.download = fileName();
       a.click();
       URL.revokeObjectURL(url);
+    }, "image/png");
+  }
+
+  function handleShare() {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    setSharing(true);
+    canvas.toBlob(async (blob) => {
+      try {
+        if (!blob) return;
+        const file = new File([blob], fileName(), { type: "image/png" });
+        await navigator.share({
+          files: [file],
+          title: `Koledar ${SLOVENIAN_MONTHS[month]} ${year}`,
+        });
+      } catch {
+        // uporabnik je prekinil deljenje - ni napaka
+      } finally {
+        setSharing(false);
+      }
     }, "image/png");
   }
 
@@ -227,9 +280,23 @@ export default function CalendarSnapshot() {
       <div className="flex justify-center rounded-md border border-gray-200 p-2 dark:border-gray-800">
         <canvas ref={canvasRef} className="block h-auto w-full max-w-xs" />
       </div>
-      <Button type="button" onClick={handleDownload} disabled={loading}>
-        {loading ? "Nalagam …" : "Prenesi sliko"}
-      </Button>
+      <div className="flex gap-2">
+        <Button type="button" onClick={handleDownload} disabled={loading}>
+          {loading ? "Nalagam …" : "Prenesi sliko"}
+        </Button>
+        {shareSupported && (
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={handleShare}
+            disabled={loading || sharing}
+            aria-label="Deli sliko"
+            title="Deli sliko"
+          >
+            <ShareIcon />
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
