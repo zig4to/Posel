@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import clsx from "@/lib/utils/clsx";
 import { logoutAction } from "@/actions/auth";
-import ThemeToggle from "@/components/theme/ThemeToggle";
 
 const LINKS = [
   { href: "/", label: "Koledar" },
@@ -99,9 +98,13 @@ export default function MainNav({ userEmail }: { userEmail: string | null }) {
                 </p>
               )}
               <div className="my-1 border-t border-gray-200 dark:border-gray-700" />
-              <div className="flex justify-center px-2 py-2">
-                <ThemeToggle />
-              </div>
+              <Link
+                href="/nastavitve"
+                onClick={() => setOpen(false)}
+                className="block w-full rounded-md px-2 py-2 text-left text-sm font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+              >
+                Nastavitve
+              </Link>
               <div className="my-1 border-t border-gray-200 dark:border-gray-700" />
               <form action={logoutAction}>
                 <button
