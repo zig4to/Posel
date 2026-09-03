@@ -10,6 +10,24 @@ import { setMonthlyTaxAction } from "@/actions/monthlyTaxes";
 import { createClient } from "@/lib/supabase/client";
 import { getMonthlyTax } from "@/lib/data/monthlyTaxes";
 
+function LandmarkIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-4 w-4"
+      aria-hidden="true"
+    >
+      <path d="M12 3 3 8h18l-9-5Z" />
+      <path d="M5 11v7M10 11v7M14 11v7M19 11v7M3 21h18" />
+    </svg>
+  );
+}
+
 export default function TaxObligationsButton() {
   const router = useRouter();
   const now = new Date();
@@ -59,8 +77,14 @@ export default function TaxObligationsButton() {
 
   return (
     <>
-      <Button type="button" variant="warning" onClick={() => setOpen(true)}>
-        Davčne obveznosti
+      <Button
+        type="button"
+        variant="warning"
+        onClick={() => setOpen(true)}
+        aria-label="Davčne obveznosti"
+        title="Davčne obveznosti"
+      >
+        <LandmarkIcon />
       </Button>
 
       <Modal open={open} onClose={() => setOpen(false)} title="Davčne obveznosti">

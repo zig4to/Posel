@@ -52,8 +52,8 @@ export default async function ProjektiPage() {
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Projekti</h1>
-        <div className="flex flex-col items-end gap-2">
+        <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Vsi projekti</h1>
+        <div className="flex items-center gap-2">
           {clients.length > 0 && (
             <Link href="/projekti/nov">
               <Button>+ Dodaj projekt</Button>
@@ -93,7 +93,7 @@ export default async function ProjektiPage() {
                   {formatMonthLabel(key)}
                 </h2>
 
-                <div className="mb-3 grid grid-cols-2 gap-3 rounded-md border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900 sm:grid-cols-5">
+                <div className="mb-3 grid grid-cols-2 gap-3 rounded-md border border-gray-200 border-l-4 border-l-blue-500 bg-white p-3 dark:border-gray-800 dark:border-l-blue-500 dark:bg-gray-900 sm:grid-cols-5">
                   <div>
                     <p className="text-xs text-gray-500 dark:text-gray-400">Stroški</p>
                     <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
@@ -127,6 +127,10 @@ export default async function ProjektiPage() {
                     </p>
                   </div>
                 </div>
+
+                <h3 className="mb-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
+                  Projekti
+                </h3>
 
                 <div className="space-y-2">
                   {monthProjects.length === 0 && (
