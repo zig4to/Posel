@@ -1,5 +1,5 @@
 import ThemeToggle from "@/components/theme/ThemeToggle";
-import CalendarSnapshot from "@/components/settings/CalendarSnapshot";
+import CalendarSnapshotCard from "@/components/settings/CalendarSnapshotCard";
 
 export default function NastavitvePage() {
   return (
@@ -18,16 +18,7 @@ export default function NastavitvePage() {
         </div>
       </div>
 
-      <div className="rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
-        <p className="mb-1 text-sm font-medium text-gray-900 dark:text-gray-100">
-          Slika koledarja
-        </p>
-        <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
-          Prenesi sliko izbranega meseca — obarvana obroba pomeni dan z vnosom v
-          koledarju, siva obroba pomeni prazen dan.
-        </p>
-        <CalendarSnapshot />
-      </div>
+      <CalendarSnapshotCard />
     </div>
   );
 }
