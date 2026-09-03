@@ -24,17 +24,19 @@ export default function ProjectCard({ project }: { project: ProjectWithClient })
   const costNotes = costItems.filter((item) => item.note && item.note.trim());
   const hasNotes = Boolean(project.note) || costNotes.length > 0;
 
+  const clientColor = project.clients?.color ?? "#9CA3AF";
+
   return (
-    <div className="rounded-md border border-gray-200 bg-white px-4 py-3 dark:border-gray-800 dark:bg-gray-900">
+    <div
+      className="rounded-md border bg-white px-4 py-3 dark:bg-gray-900"
+      style={{ borderColor: clientColor }}
+    >
       <div className="min-w-0">
         <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
           {project.name}
         </p>
         <div className="mt-0.5 flex items-center gap-2">
-          <ColorDot
-            color={project.clients?.color ?? "#9CA3AF"}
-            className="h-2.5 w-2.5 flex-shrink-0"
-          />
+          <ColorDot color={clientColor} className="h-2.5 w-2.5 flex-shrink-0" />
           <p className="truncate text-xs text-gray-600 dark:text-gray-400">
             {project.clients?.company_name ?? "Neznan partner"}
           </p>
