@@ -56,7 +56,7 @@ export default async function ProjektiPage() {
         <div className="flex items-center gap-2">
           {clients.length > 0 && (
             <Link href="/projekti/nov">
-              <Button>+ Dodaj projekt</Button>
+              <Button className="h-8">+ Dodaj projekt</Button>
             </Link>
           )}
           <TaxObligationsButton />

@@ -80,6 +80,7 @@ export default function TaxObligationsButton() {
       <Button
         type="button"
         variant="warning"
+        className="h-8"
         onClick={() => setOpen(true)}
         aria-label="Davčne obveznosti"
         title="Davčne obveznosti"
