@@ -27,10 +27,11 @@ body {
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
 
-/* Na desktopu (sm+) je vsa postavitev (rem-based Tailwind razredi: pisava,
-   presledki, velikosti) povečana za 10%, kot bi uporabnik povečal stran
-   na 110% namesto 100%. Mobilni pogled ostane nespremenjen. */
-@media (min-width: 640px) {
+/* Šele na zelo širokih zaslonih (2xl+) je vsa postavitev (rem-based Tailwind
+   razredi: pisava, presledki, velikosti) povečana za 10%, kot bi uporabnik
+   povečal stran na 110% namesto 100%. Pod 2xl (torej tudi na navadnem
+   desktopu in mobilcu) stran ostane pri 100%. */
+@media (min-width: 1536px) {
   html {
     font-size: 110%;
   }
