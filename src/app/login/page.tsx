@@ -5,6 +5,7 @@ import { loginAction, type LoginState } from "@/actions/auth";
 import { Field, Input } from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import ThemeToggle from "@/components/theme/ThemeToggle";
+import SsoBridge from "@/components/auth/SsoBridge";
 
 const initialState: LoginState = {};
 
@@ -16,6 +17,7 @@ export default function LoginPage() {
 
   return (
     <div className="relative flex min-h-screen items-center justify-center bg-gray-50 px-4 dark:bg-gray-950">
+      <SsoBridge />
       <div className="absolute right-4 top-4">
         <ThemeToggle />
       </div>

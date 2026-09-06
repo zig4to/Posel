@@ -1,5 +1,6 @@
 import MainNav from "@/components/nav/MainNav";
 import { createClient } from "@/lib/supabase/server";
+import SsoHashCleanup from "@/components/auth/SsoHashCleanup";
 
 export default async function AppLayout({
   children,
@@ -13,6 +14,7 @@ export default async function AppLayout({
 
   return (
     <>
+      <SsoHashCleanup />
       <MainNav userEmail={user?.email ?? null} />
       <main className="mx-auto w-full min-w-0 max-w-5xl flex-1 overflow-x-hidden px-4 py-6">
         {children}
