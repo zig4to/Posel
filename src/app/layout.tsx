@@ -3,6 +3,7 @@ import { Rubik } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import ThemeScript from "@/components/theme/ThemeScript";
+import SsoPrepaintScript from "@/components/auth/SsoPrepaintScript";
 
 const rubik = Rubik({
   variable: "--font-rubik",
@@ -28,11 +29,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="sl"
       data-theme="light"
+      data-sso="idle"
       suppressHydrationWarning
       className={`${rubik.variable} h-full overflow-x-hidden antialiased`}
     >
       <head>
         <ThemeScript />
+        <SsoPrepaintScript />
       </head>
       <body className="flex min-h-full w-full max-w-full flex-col overflow-x-hidden bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100">
         {children}

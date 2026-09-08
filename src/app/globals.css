@@ -36,3 +36,18 @@ body {
     font-size: 110%;
   }
 }
+
+/* ===== Samodejna prijava iz huba (TomsStudios) ===== */
+/* Nalagalnik je privzeto skrit. Med izmenjavo SSO žetonov ga pokaže (in skrije
+   obrazec) atribut `data-sso="pending"` na <html>, ki ga postavi sinhroni
+   skript v <head> še pred izrisom (src/lib/sso.ts); ob neuspehu ga useEffect
+   na /login vrne na "idle". */
+#sso-loader {
+  display: none;
+}
+[data-sso="pending"] #sso-loader {
+  display: flex;
+}
+[data-sso="pending"] #login-card {
+  display: none;
+}
