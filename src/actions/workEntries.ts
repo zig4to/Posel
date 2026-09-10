@@ -102,3 +102,31 @@ export async function deleteWorkEntryAction(
   revalidatePath("/");
   return {};
 }
+
+/**
+ * Izbriše vse vnose za dano stranko v obsegu datumov (vključno z robovoma).
+ * RLS poskrbi, da uporabnik briše le svoje vrstice.
+ */
+export async function deleteWorkEntriesRangeAction(
+  clientId: string,
+  from: string,
+  to: string
+): Promise<WorkEntryActionResult> {
+  if (!clientId) return { error: "Manjka stranka." };
+  if (!from || !to || to < from) return { error: "Neveljaven obseg datumov." };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("work_entries")
+    .delete()
+    .eq("client_id", clientId)
+    .gte("work_date", from)
+    .lte("work_date", to);
+
+  if (error) {
+    return { error: "Napaka pri brisanju vnosov: " + error.message };
+  }
+
+  revalidatePath("/");
+  return {};
+}

@@ -4,10 +4,11 @@ import { useState, useTransition } from "react";
 import type { Client, WorkEntryWithClient } from "@/lib/types/database.types";
 import {
   createWorkEntriesAction,
+  deleteWorkEntriesRangeAction,
   updateWorkEntryAction,
   type WorkEntryInput,
 } from "@/actions/workEntries";
-import { eachDateInRange } from "@/lib/utils/date";
+import { eachDateInRange, formatShortDate } from "@/lib/utils/date";
 import { Field, Input, Textarea } from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 
@@ -38,6 +39,39 @@ export default function TimeEntryForm({
   const [note, setNote] = useState(entry?.note ?? "");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  // Brisanje obsega dni za isto stranko (samo pri urejanju obstoječega vnosa).
+  const [rangeMode, setRangeMode] = useState(false);
+  const [rangeEnd, setRangeEnd] = useState(entry?.work_date ?? dateKey);
+
+  function handleRangeDelete() {
+    if (!entry) return;
+    setError(null);
+    if (rangeEnd < entry.work_date) {
+      setError("Datum konca mora biti enak ali za datumom začetka.");
+      return;
+    }
+    const clientName = entry.clients?.company_name ?? "to stranko";
+    const ok = confirm(
+      `Izbrisati vse vnose za "${clientName}" od ${formatShortDate(
+        entry.work_date
+      )} do ${formatShortDate(rangeEnd)}?`
+    );
+    if (!ok) return;
+
+    startTransition(async () => {
+      const result = await deleteWorkEntriesRangeAction(
+        entry.client_id,
+        entry.work_date,
+        rangeEnd
+      );
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      onSaved();
+    });
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -77,6 +111,64 @@ export default function TimeEntryForm({
       <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:bg-amber-950 dark:text-amber-300">
         Najprej dodaj vsaj enega partnerja v zavihku &quot;Partnerji&quot;.
       </p>
+    );
+  }
+
+  if (rangeMode && entry) {
+    const clientName = entry.clients?.company_name ?? "to stranko";
+    return (
+      <div className="space-y-3 rounded-md border border-gray-200 p-3 dark:border-gray-800">
+        <p className="text-sm text-gray-700 dark:text-gray-300">
+          Izbriši vse vnose za{" "}
+          <span className="font-medium">{clientName}</span> v obsegu:
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Od (datum)" htmlFor="range_del_from">
+            <Input
+              id="range_del_from"
+              type="date"
+              value={entry.work_date}
+              disabled
+            />
+          </Field>
+          <Field label="Do (datum)" htmlFor="range_del_to">
+            <Input
+              id="range_del_to"
+              type="date"
+              value={rangeEnd}
+              min={entry.work_date}
+              onChange={(e) => setRangeEnd(e.target.value)}
+              required
+            />
+          </Field>
+        </div>
+
+        {error && (
+          <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+        )}
+
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="danger"
+            onClick={handleRangeDelete}
+            disabled={pending}
+          >
+            {pending ? "Brišem …" : "Izbriši obseg"}
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => {
+              setRangeMode(false);
+              setError(null);
+            }}
+            disabled={pending}
+          >
+            Prekliči
+          </Button>
+        </div>
+      </div>
     );
   }
 
@@ -152,25 +244,62 @@ export default function TimeEntryForm({
 
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
-      <div className="flex gap-2">
-        <Button type="submit" disabled={pending}>
-          {pending ? "Shranjujem …" : entry ? "Shrani spremembe" : "Dodaj vnos"}
-        </Button>
-        <Button type="button" variant="secondary" onClick={onCancel} disabled={pending}>
-          Prekliči
-        </Button>
-        {entry && onDelete && (
+      {entry ? (
+        <div className="grid grid-cols-2 gap-2">
+          <Button type="submit" disabled={pending} className="w-full">
+            <span className="text-xs leading-tight">
+              {pending ? "Shranjujem …" : "Shrani spremembe"}
+            </span>
+          </Button>
           <Button
             type="button"
-            variant="danger"
-            onClick={onDelete}
+            variant="secondary"
+            onClick={onCancel}
             disabled={pending}
-            className="ml-auto"
+            className="w-full"
           >
-            Izbriši
+            <span className="text-xs leading-tight">Prekliči</span>
           </Button>
-        )}
-      </div>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => {
+              setRangeEnd(entry.work_date);
+              setError(null);
+              setRangeMode(true);
+            }}
+            disabled={pending}
+            className="h-8 w-full"
+          >
+            <span className="text-xs leading-tight">Izbriši obseg dni</span>
+          </Button>
+          {onDelete && (
+            <Button
+              type="button"
+              variant="danger"
+              onClick={onDelete}
+              disabled={pending}
+              className="h-8 w-full"
+            >
+              <span className="text-xs leading-tight">Izbriši</span>
+            </Button>
+          )}
+        </div>
+      ) : (
+        <div className="flex gap-2">
+          <Button type="submit" disabled={pending}>
+            {pending ? "Shranjujem …" : "Dodaj vnos"}
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onCancel}
+            disabled={pending}
+          >
+            Prekliči
+          </Button>
+        </div>
+      )}
     </form>
   );
 }
