@@ -192,30 +192,35 @@ export default function MonthCalendar({ clients }: { clients: Client[] }) {
             setMonth(m);
           }}
         />
-        <FilterMenu
-          clients={clients}
-          selectedClientId={filterClientId}
-          onClientChange={setFilterClientId}
-          year={year}
-          month={month}
-          onDateChange={(y, m) => {
-            setYear(y);
-            setMonth(m);
-          }}
-        />
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={() => setShowWeekends((v) => !v)}
-          aria-label={showWeekends ? "Skrij vikende" : "Pokaži vikende"}
-          title={showWeekends ? "Skrij vikende" : "Pokaži vikende"}
-          className="h-10 flex-shrink-0"
-        >
-          {showWeekends ? <PanelRightOpenIcon /> : <PanelRightCloseIcon />}
-          <span className="hidden sm:inline">
-            {showWeekends ? "Skrij vikende" : "Pokaži vikende"}
-          </span>
-        </Button>
+        {/* Na mobilnem oba gumba (Filter + prikaz vikendov) poravnamo desno;
+            na desktopu (sm+) ovoj izgine (display:contents) in gumba se
+            obnašata kot prej v skupni vrstici. */}
+        <div className="ml-auto flex flex-shrink-0 items-center gap-1.5 sm:ml-0 sm:contents">
+          <FilterMenu
+            clients={clients}
+            selectedClientId={filterClientId}
+            onClientChange={setFilterClientId}
+            year={year}
+            month={month}
+            onDateChange={(y, m) => {
+              setYear(y);
+              setMonth(m);
+            }}
+          />
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => setShowWeekends((v) => !v)}
+            aria-label={showWeekends ? "Skrij vikende" : "Pokaži vikende"}
+            title={showWeekends ? "Skrij vikende" : "Pokaži vikende"}
+            className="flex-shrink-0"
+          >
+            {showWeekends ? <PanelRightOpenIcon /> : <PanelRightCloseIcon />}
+            <span className="hidden sm:inline">
+              {showWeekends ? "Skrij vikende" : "Pokaži vikende"}
+            </span>
+          </Button>
+        </div>
       </div>
 
       <div

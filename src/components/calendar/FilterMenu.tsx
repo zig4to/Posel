@@ -233,7 +233,7 @@ export default function FilterMenu({
         type="button"
         onClick={toggleOpen}
         className={clsx(
-          "inline-flex h-10 max-w-full flex-shrink-0 items-center gap-1.5 rounded-md border px-2 text-sm font-medium sm:gap-2 sm:px-3",
+          "inline-flex max-w-full flex-shrink-0 items-center gap-1.5 rounded-md border px-2 py-2 text-sm font-medium sm:gap-2 sm:px-3",
           selectedClient
             ? "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300"
             : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
