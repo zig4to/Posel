@@ -101,6 +101,24 @@ export function getMonthRange(
   return { from, to };
 }
 
+/**
+ * Vrne vse dneve "YYYY-MM-DD" od startKey do endKey (vključno z obema).
+ * Prazen seznam, če je endKey pred startKey. Uporablja lokalne datume.
+ */
+export function eachDateInRange(startKey: string, endKey: string): string[] {
+  if (endKey < startKey) return [];
+  const [ys, ms, ds] = startKey.split("-").map(Number);
+  const [ye, me, de] = endKey.split("-").map(Number);
+  const cur = new Date(ys, ms - 1, ds);
+  const end = new Date(ye, me - 1, de);
+  const out: string[] = [];
+  while (cur <= end) {
+    out.push(formatDateKey(cur));
+    cur.setDate(cur.getDate() + 1);
+  }
+  return out;
+}
+
 /** Formatira uro "HH:MM:SS" ali "HH:MM" v "HH:MM" za prikaz. */
 export function formatTime(time: string | null): string {
   if (!time) return "";

@@ -3,10 +3,11 @@
 import { useState, useTransition } from "react";
 import type { Client, WorkEntryWithClient } from "@/lib/types/database.types";
 import {
-  createWorkEntryAction,
+  createWorkEntriesAction,
   updateWorkEntryAction,
   type WorkEntryInput,
 } from "@/actions/workEntries";
+import { eachDateInRange } from "@/lib/utils/date";
 import { Field, Input, Textarea } from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 
@@ -16,6 +17,7 @@ type TimeEntryFormProps = {
   entry?: WorkEntryWithClient; // če je podan, gre za urejanje
   onSaved: () => void;
   onCancel: () => void;
+  onDelete?: () => void; // prikaže gumb "Izbriši" (samo pri urejanju)
 };
 
 export default function TimeEntryForm({
@@ -24,8 +26,13 @@ export default function TimeEntryForm({
   entry,
   onSaved,
   onCancel,
+  onDelete,
 }: TimeEntryFormProps) {
   const [clientId, setClientId] = useState(entry?.client_id ?? clients[0]?.id ?? "");
+  // Razpon datumov - samo pri dodajanju (uredimo lahko en sam dan).
+  // Začetni dan je tisti, kjer smo kliknili "Dodaj"; konec nastavi uporabnik.
+  const [startDate, setStartDate] = useState(dateKey);
+  const [endDate, setEndDate] = useState(dateKey);
   const [startTime, setStartTime] = useState(entry?.start_time?.slice(0, 5) ?? "");
   const [endTime, setEndTime] = useState(entry?.end_time?.slice(0, 5) ?? "");
   const [note, setNote] = useState(entry?.note ?? "");
@@ -44,10 +51,18 @@ export default function TimeEntryForm({
       note: note.trim() || null,
     };
 
+    if (!entry && endDate < startDate) {
+      setError("Datum konca mora biti enak ali za datumom začetka.");
+      return;
+    }
+
     startTransition(async () => {
       const result = entry
         ? await updateWorkEntryAction(entry.id, input)
-        : await createWorkEntryAction(input);
+        : await createWorkEntriesAction(
+            input,
+            eachDateInRange(startDate, endDate)
+          );
 
       if (result.error) {
         setError(result.error);
@@ -83,8 +98,32 @@ export default function TimeEntryForm({
         </select>
       </Field>
 
+      {!entry && (
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Od (datum)" htmlFor="start_date">
+            <Input
+              id="start_date"
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              required
+            />
+          </Field>
+          <Field label="Do (datum)" htmlFor="end_date">
+            <Input
+              id="end_date"
+              type="date"
+              value={endDate}
+              min={startDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              required
+            />
+          </Field>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Od" htmlFor="start_time">
+        <Field label="Od (ura)" htmlFor="start_time">
           <Input
             id="start_time"
             type="time"
@@ -92,7 +131,7 @@ export default function TimeEntryForm({
             onChange={(e) => setStartTime(e.target.value)}
           />
         </Field>
-        <Field label="Do" htmlFor="end_time">
+        <Field label="Do (ura)" htmlFor="end_time">
           <Input
             id="end_time"
             type="time"
@@ -120,6 +159,17 @@ export default function TimeEntryForm({
         <Button type="button" variant="secondary" onClick={onCancel} disabled={pending}>
           Prekliči
         </Button>
+        {entry && onDelete && (
+          <Button
+            type="button"
+            variant="danger"
+            onClick={onDelete}
+            disabled={pending}
+            className="ml-auto"
+          >
+            Izbriši
+          </Button>
+        )}
       </div>
     </form>
   );

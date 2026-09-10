@@ -15,6 +15,7 @@ type EventFormProps = {
   event?: CalendarEvent; // če je podan, gre za urejanje
   onSaved: () => void;
   onCancel: () => void;
+  onDelete?: () => void; // prikaže gumb "Izbriši" (samo pri urejanju)
 };
 
 export default function EventForm({
@@ -22,6 +23,7 @@ export default function EventForm({
   event,
   onSaved,
   onCancel,
+  onDelete,
 }: EventFormProps) {
   const [title, setTitle] = useState(event?.title ?? "");
   const [startTime, setStartTime] = useState(event?.start_time?.slice(0, 5) ?? "");
@@ -113,6 +115,17 @@ export default function EventForm({
         >
           Prekliči
         </Button>
+        {event && onDelete && (
+          <Button
+            type="button"
+            variant="danger"
+            onClick={onDelete}
+            disabled={pending}
+            className="ml-auto"
+          >
+            Izbriši
+          </Button>
+        )}
       </div>
     </form>
   );

@@ -39,6 +39,35 @@ export async function createWorkEntryAction(
   return {};
 }
 
+/**
+ * Ustvari isti vnos za več dni hkrati (razpon datumov ob dodajanju stranke).
+ * `work_date` v `input` se ignorira - datume podaš v `workDates`.
+ */
+export async function createWorkEntriesAction(
+  input: WorkEntryInput,
+  workDates: string[]
+): Promise<WorkEntryActionResult> {
+  if (workDates.length === 0) return { error: "Manjka datum." };
+  if (workDates.length > 366) {
+    return { error: "Obdobje je predolgo (največ 366 dni)." };
+  }
+
+  const validationError = validate({ ...input, work_date: workDates[0] });
+  if (validationError) return { error: validationError };
+
+  const rows = workDates.map((work_date) => ({ ...input, work_date }));
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("work_entries").insert(rows);
+
+  if (error) {
+    return { error: "Napaka pri shranjevanju vnosa: " + error.message };
+  }
+
+  revalidatePath("/");
+  return {};
+}
+
 export async function updateWorkEntryAction(
   id: string,
   input: WorkEntryInput
