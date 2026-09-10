@@ -51,7 +51,8 @@ export default function CalendarDayCell({
       ? leaveColorsForDay
           .map((c, i) => {
             const angle = i % 2 === 0 ? 45 : 135;
-            return `repeating-linear-gradient(${angle}deg, ${c} 0 2px, transparent 2px 9px)`;
+            // 90% prosojnost (hex alfa E6), tanke ~1px črte z razmikom.
+            return `repeating-linear-gradient(${angle}deg, ${c}E6 0 1px, transparent 1px 9px)`;
           })
           .join(", ")
       : undefined;
@@ -72,6 +73,9 @@ export default function CalendarDayCell({
       style={Object.keys(style).length > 0 ? style : undefined}
       className={clsx(
         "flex min-w-0 flex-col items-start gap-1 overflow-hidden rounded-md p-1.5 text-left transition-[filter,background-color,border-color] sm:p-2",
+        // Ko so vikendi prikazani (ožje celice), na telefonu zmanjšamo levi
+        // rob kartice, da je vsebina bliže levemu robu.
+        !large && "max-sm:pl-0.5",
         // Na mobilnem naj bo kartica minimalne višine (prilagojena vsebini).
         // Dnevi trenutnega meseca imajo spodnjo mejo približno višine ene
         // vrstice vnosa (da prazni dnevi niso videti "stlačeni" glede na
@@ -93,10 +97,22 @@ export default function CalendarDayCell({
           : "border border-transparent bg-gray-50 hover:bg-gray-100 dark:bg-gray-900/40 dark:hover:bg-gray-800"
       )}
     >
-      <div className="flex w-full items-center justify-between gap-1">
+      <div
+        className={clsx(
+          "flex w-full gap-1",
+          large
+            ? "items-center justify-between"
+            : // Ko so vikendi prikazani (ožje celice): na telefonu ikono dogodka
+              // postavimo pod številko dneva; na desktopu (sm+) ostane desno od nje.
+              "flex-col items-start sm:flex-row sm:items-center sm:justify-between"
+        )}
+      >
         <span
           className={clsx(
             "inline-flex items-center justify-center rounded-full px-1",
+            // Telefon + razširjen pogled: številko poravnamo levo (namesto
+            // sredinsko), da se njen levi rob ujema z ikono dogodka spodaj.
+            !large && !day.isToday && "max-sm:justify-start",
             // Na mobilnem je krogec za današnji dan malenkost manjši kot ostale
             // oznake dni; na desktopu (sm+) ostane enak kot prej.
             day.isToday
@@ -117,12 +133,21 @@ export default function CalendarDayCell({
           {day.date.getDate()}
         </span>
         {hasEvents && (
-          <EventIcon
+          <span
             className={clsx(
-              "flex-shrink-0 text-amber-500 dark:text-amber-400",
-              large ? "h-4 w-4" : "h-3.5 w-3.5"
+              "flex flex-shrink-0",
+              // Ovoj z levim paddingom = poravnava z levim robom številke
+              // (px-1 na njej); padding je na ovoju, da se SVG ne stisne.
+              !large && "max-sm:pl-1"
             )}
-          />
+          >
+            <EventIcon
+              className={clsx(
+                "text-amber-500 dark:text-amber-400",
+                large ? "h-4 w-4" : "h-[18px] w-[18px]"
+              )}
+            />
+          </span>
         )}
       </div>
       <div className="flex w-full flex-1 flex-col gap-0.5 overflow-hidden">
@@ -134,11 +159,19 @@ export default function CalendarDayCell({
               // ime na voljo celo širino kartice; na desktopu (sm+) ostaneta
               // krogec in ime v eni vrstici kot prej.
               "flex w-full min-w-0 flex-col items-start gap-0.5 rounded bg-gray-50 px-1 py-0.5 text-gray-600 dark:bg-gray-800 dark:text-gray-300 sm:flex-row sm:items-center sm:gap-1 sm:py-0",
-              large ? "text-[10px] sm:text-sm" : "text-[9px] sm:text-xs"
+              large ? "text-[10px] sm:text-sm" : "text-[9px] sm:text-xs",
+              // Ko so vikendi prikazani, na telefonu ime stranke tesneje ob
+              // levem robu sive ploščice.
+              !large && "max-sm:px-0.5"
             )}
             title={c.companyName}
           >
-            <ColorDot color={c.color} />
+            {/* Ko so vikendi prikazani, na telefonu skrijemo krogec stranke
+                (ime pustimo); sicer je krogec vedno viden. */}
+            <ColorDot
+              color={c.color}
+              className={!large ? "max-sm:hidden" : undefined}
+            />
             {/* Brez elipse (...) - besedilo naj se ob robu preprosto odreže. */}
             <span className="w-full min-w-0 overflow-hidden text-clip whitespace-nowrap">
               {c.companyName}
