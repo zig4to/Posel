@@ -4,16 +4,19 @@ import { useState, useTransition } from "react";
 import type {
   CalendarEvent,
   Client,
+  Leave,
   WorkEntryWithClient,
 } from "@/lib/types/database.types";
 import Modal from "@/components/ui/Modal";
 import Button from "@/components/ui/Button";
 import { ColorDot } from "@/components/ui/Badge";
-import { formatFullDate, formatTime } from "@/lib/utils/date";
+import { formatFullDate, formatShortDate, formatTime } from "@/lib/utils/date";
 import { deleteWorkEntryAction } from "@/actions/workEntries";
 import { deleteEventAction } from "@/actions/events";
+import { deleteLeaveAction } from "@/actions/leaves";
 import TimeEntryForm from "./TimeEntryForm";
 import EventForm from "./EventForm";
+import LeaveForm from "./LeaveForm";
 import EventIcon from "./EventIcon";
 
 type DayDetailPanelProps = {
@@ -21,6 +24,7 @@ type DayDetailPanelProps = {
   dateKey: string;
   entries: WorkEntryWithClient[];
   events: CalendarEvent[];
+  leaves: Leave[];
   clients: Client[];
   onClose: () => void;
   onChanged: () => void; // pokliči po vsaki spremembi, da se osveži mesečni prikaz
@@ -31,7 +35,9 @@ type Mode =
   | "add"
   | "edit"
   | "add-event"
-  | "edit-event";
+  | "edit-event"
+  | "add-leave"
+  | "edit-leave";
 
 function formatTimeRange(start: string | null, end: string | null): string {
   if (!start && !end) return "Brez določenih ur";
@@ -43,6 +49,7 @@ export default function DayDetailPanel({
   dateKey,
   entries,
   events,
+  leaves,
   clients,
   onClose,
   onChanged,
@@ -52,6 +59,7 @@ export default function DayDetailPanel({
     null
   );
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
+  const [editingLeave, setEditingLeave] = useState<Leave | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -59,6 +67,7 @@ export default function DayDetailPanel({
     setMode("list");
     setEditingEntry(null);
     setEditingEvent(null);
+    setEditingLeave(null);
     onChanged();
   }
 
@@ -77,6 +86,16 @@ export default function DayDetailPanel({
     setDeletingId(event.id);
     startTransition(async () => {
       await deleteEventAction(event.id);
+      setDeletingId(null);
+      onChanged();
+    });
+  }
+
+  function handleDeleteLeave(leave: Leave) {
+    if (!confirm("Izbriši ta dopust?")) return;
+    setDeletingId(leave.id);
+    startTransition(async () => {
+      await deleteLeaveAction(leave.id);
       setDeletingId(null);
       onChanged();
     });
@@ -202,6 +221,56 @@ export default function DayDetailPanel({
             >
               + Dodaj dogodek
             </Button>
+
+            {leaves.length > 0 && (
+              <ul className="space-y-2 pt-1">
+                {leaves.map((leave) => (
+                  <li
+                    key={leave.id}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-gray-200 px-3 py-2 dark:border-gray-800"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 text-sm font-medium text-gray-900 dark:text-gray-100">
+                        <ColorDot color={leave.color} />
+                        <span className="min-w-0 truncate">{leave.title}</span>
+                      </div>
+                      <p className="break-words text-xs text-gray-500 dark:text-gray-400">
+                        Dopust: {formatShortDate(leave.start_date)} –{" "}
+                        {formatShortDate(leave.end_date)}
+                      </p>
+                    </div>
+                    <div className="flex flex-shrink-0 gap-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => {
+                          setEditingLeave(leave);
+                          setMode("edit-leave");
+                        }}
+                      >
+                        Uredi
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        disabled={pending && deletingId === leave.id}
+                        onClick={() => handleDeleteLeave(leave)}
+                      >
+                        Izbriši
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <Button
+              type="button"
+              onClick={() => setMode("add-leave")}
+              className="w-full"
+            >
+              + Dodaj dopust
+            </Button>
           </section>
         </div>
       )}
@@ -244,6 +313,26 @@ export default function DayDetailPanel({
           onCancel={() => {
             setMode("list");
             setEditingEvent(null);
+          }}
+        />
+      )}
+
+      {mode === "add-leave" && (
+        <LeaveForm
+          dateKey={dateKey}
+          onSaved={handleSaved}
+          onCancel={() => setMode("list")}
+        />
+      )}
+
+      {mode === "edit-leave" && editingLeave && (
+        <LeaveForm
+          dateKey={dateKey}
+          leave={editingLeave}
+          onSaved={handleSaved}
+          onCancel={() => {
+            setMode("list");
+            setEditingLeave(null);
           }}
         />
       )}

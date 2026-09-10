@@ -21,3 +21,13 @@ export function nextClientColor(existingClientCount: number): string {
   const index = existingClientCount % CLIENT_COLOR_PALETTE.length;
   return CLIENT_COLOR_PALETTE[index];
 }
+
+// Paleta barv za dopuste (diagonalno šrafiran vzorec na koledarju).
+export const LEAVE_COLOR_PALETTE = [
+  "#0EA5E9", // nebo modra
+  "#8B5CF6", // vijolična
+  "#F43F5E", // roza-rdeča
+  "#22C55E", // zelena
+  "#F59E0B", // jantarna
+  "#64748B", // skrilavec
+] as const;

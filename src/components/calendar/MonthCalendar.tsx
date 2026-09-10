@@ -4,11 +4,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
   CalendarEvent,
   Client,
+  Leave,
   WorkEntryWithClient,
 } from "@/lib/types/database.types";
 import { createClient } from "@/lib/supabase/client";
 import { getWorkEntriesInRange } from "@/lib/data/workEntries";
 import { getEventsInRange } from "@/lib/data/events";
+import { getLeavesInRange } from "@/lib/data/leaves";
 import {
   getMonthGrid,
   getMonthRange,
@@ -66,6 +68,7 @@ export default function MonthCalendar({ clients }: { clients: Client[] }) {
   const [month, setMonth] = useState(today.getMonth());
   const [entries, setEntries] = useState<WorkEntryWithClient[]>([]);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [leaves, setLeaves] = useState<Leave[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterClientId, setFilterClientId] = useState<string | null>(null);
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
@@ -87,12 +90,14 @@ export default function MonthCalendar({ clients }: { clients: Client[] }) {
     const supabase = createClient();
     const { from, to } = getMonthRange(year, month);
     try {
-      const [entryData, eventData] = await Promise.all([
+      const [entryData, eventData, leaveData] = await Promise.all([
         getWorkEntriesInRange(supabase, from, to),
         getEventsInRange(supabase, from, to),
+        getLeavesInRange(supabase, from, to),
       ]);
       setEntries(entryData);
       setEvents(eventData);
+      setLeaves(leaveData);
     } finally {
       setLoading(false);
     }
@@ -166,6 +171,14 @@ export default function MonthCalendar({ clients }: { clients: Client[] }) {
     return Array.from(seen.values());
   }
 
+  // Dopusti, ki pokrivajo dani dan (start_date <= dan <= end_date).
+  // ISO datumi "YYYY-MM-DD" se pravilno primerjajo leksikografsko.
+  function leavesForDay(dateKey: string): Leave[] {
+    return leaves.filter(
+      (l) => l.start_date <= dateKey && dateKey <= l.end_date
+    );
+  }
+
   const selectedDay = days.find((d) => d.dateKey === selectedDateKey);
 
   return (
@@ -229,6 +242,7 @@ export default function MonthCalendar({ clients }: { clients: Client[] }) {
             day={day}
             clientsForDay={clientSummaryForDay(day.dateKey)}
             hasEvents={(eventsByDay.get(day.dateKey)?.length ?? 0) > 0}
+            leaveColorsForDay={leavesForDay(day.dateKey).map((l) => l.color)}
             onClick={() => setSelectedDateKey(day.dateKey)}
             large={!showWeekends}
           />
@@ -241,6 +255,7 @@ export default function MonthCalendar({ clients }: { clients: Client[] }) {
           dateKey={selectedDay.dateKey}
           entries={entriesByDayAll.get(selectedDay.dateKey) ?? []}
           events={eventsByDay.get(selectedDay.dateKey) ?? []}
+          leaves={leavesForDay(selectedDay.dateKey)}
           clients={clients}
           onClose={() => setSelectedDateKey(null)}
           onChanged={loadData}

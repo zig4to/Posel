@@ -107,6 +107,12 @@ export function formatTime(time: string | null): string {
   return time.slice(0, 5);
 }
 
+/** Formatira ključ "YYYY-MM-DD" v kratek zapis "d. m. yyyy". */
+export function formatShortDate(dateKey: string): string {
+  const [y, m, d] = dateKey.split("-");
+  return `${Number(d)}. ${Number(m)}. ${y}`;
+}
+
 export function formatFullDate(date: Date): string {
   const weekday = SLOVENIAN_WEEKDAYS_SHORT[mondayFirstWeekday(date)];
   return `${weekday}, ${date.getDate()}. ${

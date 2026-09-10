@@ -176,6 +176,39 @@ export type Database = {
           updated_at?: string;
         };
       };
+      leaves: {
+        Relationships: [];
+        Row: {
+          id: string;
+          user_id: string;
+          title: string;
+          start_date: string;
+          end_date: string;
+          color: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          title: string;
+          start_date: string;
+          end_date: string;
+          color?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          title?: string;
+          start_date?: string;
+          end_date?: string;
+          color?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
       monthly_taxes: {
         Relationships: [];
         Row: {
@@ -244,6 +277,10 @@ export type CalendarEventInsert =
   Database["public"]["Tables"]["events"]["Insert"];
 export type CalendarEventUpdate =
   Database["public"]["Tables"]["events"]["Update"];
+
+export type Leave = Database["public"]["Tables"]["leaves"]["Row"];
+export type LeaveInsert = Database["public"]["Tables"]["leaves"]["Insert"];
+export type LeaveUpdate = Database["public"]["Tables"]["leaves"]["Update"];
 
 export type MonthlyTax = Database["public"]["Tables"]["monthly_taxes"]["Row"];
 export type MonthlyTaxInsert =

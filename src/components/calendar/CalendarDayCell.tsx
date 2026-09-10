@@ -1,5 +1,6 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import clsx from "@/lib/utils/clsx";
 import type { CalendarDay } from "@/lib/utils/date";
 import { ColorDot } from "@/components/ui/Badge";
@@ -18,6 +19,7 @@ export default function CalendarDayCell({
   day,
   clientsForDay,
   hasEvents = false,
+  leaveColorsForDay = [],
   onClick,
   large = false,
 }: {
@@ -25,6 +27,8 @@ export default function CalendarDayCell({
   clientsForDay: DayClientSummary[];
   /** Ali ima ta dan vsaj en dogodek (prikaže ikono dogodka). */
   hasEvents?: boolean;
+  /** Barve dopustov, ki pokrivajo ta dan (diagonalno šrafiran vzorec). */
+  leaveColorsForDay?: string[];
   onClick: () => void;
   /** Večje kartice, ko so vikend stolpci skriti in dnevi zapolnijo cel zaslon. */
   large?: boolean;
@@ -40,15 +44,32 @@ export default function CalendarDayCell({
   // Vikend dnevi (sobota/nedelja) dobijo rahlo sivo ozadje za lažje ločevanje.
   const isWeekendShade = day.isCurrentMonth && day.isWeekend && !clientColor;
 
+  // Diagonalno šrafiran vzorec (tanke črte z razmikom) za vsak dopust,
+  // ki pokriva ta dan - prikaže se na vseh dnevih v obsegu dopusta.
+  const leaveStripes =
+    leaveColorsForDay.length > 0
+      ? leaveColorsForDay
+          .map((c, i) => {
+            const angle = i % 2 === 0 ? 45 : 135;
+            return `repeating-linear-gradient(${angle}deg, ${c} 0 2px, transparent 2px 9px)`;
+          })
+          .join(", ")
+      : undefined;
+
+  const style: CSSProperties = {};
+  if (clientColor) {
+    style.borderColor = clientColor;
+    style.backgroundColor = `${clientColor}26`;
+  }
+  if (leaveStripes) {
+    style.backgroundImage = leaveStripes;
+  }
+
   return (
     <button
       type="button"
       onClick={onClick}
-      style={
-        clientColor
-          ? { borderColor: clientColor, backgroundColor: `${clientColor}26` }
-          : undefined
-      }
+      style={Object.keys(style).length > 0 ? style : undefined}
       className={clsx(
         "flex min-w-0 flex-col items-start gap-1 overflow-hidden rounded-md p-1.5 text-left transition-[filter,background-color,border-color] sm:p-2",
         // Na mobilnem naj bo kartica minimalne višine (prilagojena vsebini).
