@@ -5,6 +5,7 @@ import MonthYearPicker from "@/components/calendar/MonthYearPicker";
 import Button from "@/components/ui/Button";
 import { createClient } from "@/lib/supabase/client";
 import { getWorkEntriesInRange } from "@/lib/data/workEntries";
+import { getLeavesInRange } from "@/lib/data/leaves";
 import {
   getMonthGrid,
   getMonthRange,
@@ -19,6 +20,7 @@ const HEADER_HEIGHT = 30;
 const TITLE_HEIGHT = 40;
 const LEGEND_HEIGHT = 40;
 const LEGEND_SAMPLE_COLOR = "#3B82F6";
+const LEGEND_LEAVE_COLOR = "#0EA5E9";
 
 type ExportTheme = "light" | "dark";
 
@@ -105,11 +107,37 @@ function roundedRectPath(
   ctx.closePath();
 }
 
+// Nariše diagonalne črte "////" čez pravokotnik (x, y, w, h).
+// Klicatelj naj prej nastavi ctx.clip() na želeno obliko (celica / krogec).
+function fillDiagonalHatch(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  color: string,
+  step = 12,
+  lineWidth = 2
+) {
+  ctx.save();
+  ctx.globalAlpha = 0.7;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lineWidth;
+  for (let i = -h; i < w; i += step) {
+    ctx.beginPath();
+    ctx.moveTo(x + i, y + h);
+    ctx.lineTo(x + i + h, y);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function drawCalendar(
   canvas: HTMLCanvasElement,
   year: number,
   month: number,
   dayColors: Map<string, string>,
+  dayLeaveColors: Map<string, string>,
   theme: ExportTheme
 ) {
   const colors = THEME_COLORS[theme];
@@ -176,6 +204,16 @@ function drawCalendar(
     }
     ctx.stroke();
 
+    // Dopust: diagonalno šrafiran vzorec čez celico v barvi dopusta.
+    const leaveColor = dayLeaveColors.get(day.dateKey);
+    if (leaveColor) {
+      ctx.save();
+      roundedRectPath(ctx, x, y, CELL_SIZE, CELL_SIZE, 8);
+      ctx.clip();
+      fillDiagonalHatch(ctx, x, y, CELL_SIZE, CELL_SIZE, leaveColor, 12, 2);
+      ctx.restore();
+    }
+
     ctx.fillStyle = colors.dayNumber;
     ctx.font = "600 14px system-ui, sans-serif";
     ctx.textAlign = "left";
@@ -196,9 +234,9 @@ function drawCalendar(
   ctx.strokeStyle = LEGEND_SAMPLE_COLOR;
   ctx.stroke();
   ctx.fillStyle = colors.dayNumber;
-  ctx.fillText("Obarvani dnevi = zaseden", lx + swatch + 8, legendY);
+  ctx.fillText("Obarvano = zaseden", lx + swatch + 8, legendY);
 
-  lx = PADDING + 230;
+  lx = PADDING + 200;
   roundedRectPath(ctx, lx, legendY - swatch + 3, swatch, swatch, 3);
   ctx.fillStyle = colors.emptyFill;
   ctx.fill();
@@ -207,6 +245,25 @@ function drawCalendar(
   ctx.stroke();
   ctx.fillStyle = colors.dayNumber;
   ctx.fillText("Neobarvani = prost", lx + swatch + 8, legendY);
+
+  // Krogec z diagonalno šrafuro "////" = dopust.
+  lx = PADDING + 390;
+  const cr = swatch / 2;
+  const ccx = lx + cr;
+  const ccy = legendY - swatch + 3 + cr;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(ccx, ccy, cr, 0, Math.PI * 2);
+  ctx.clip();
+  fillDiagonalHatch(ctx, ccx - cr, ccy - cr, swatch, swatch, LEGEND_LEAVE_COLOR, 4, 1.5);
+  ctx.restore();
+  ctx.beginPath();
+  ctx.arc(ccx, ccy, cr, 0, Math.PI * 2);
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = colors.emptyBorder;
+  ctx.stroke();
+  ctx.fillStyle = colors.dayNumber;
+  ctx.fillText("Šrafirano = dopust", lx + swatch + 8, legendY);
 }
 
 export default function CalendarSnapshot() {
@@ -238,14 +295,32 @@ export default function CalendarSnapshot() {
     try {
       const supabase = createClient();
       const { from, to } = getMonthRange(year, month);
-      const entries = await getWorkEntriesInRange(supabase, from, to);
+      const [entries, leaves] = await Promise.all([
+        getWorkEntriesInRange(supabase, from, to),
+        getLeavesInRange(supabase, from, to),
+      ]);
       const dayColors = new Map<string, string>();
       for (const entry of entries) {
         if (!entry.clients || dayColors.has(entry.work_date)) continue;
         dayColors.set(entry.work_date, entry.clients.color);
       }
+      const dayLeaveColors = new Map<string, string>();
+      for (const day of getMonthGrid(year, month)) {
+        if (!day.isCurrentMonth || dayLeaveColors.has(day.dateKey)) continue;
+        const leave = leaves.find(
+          (l) => l.start_date <= day.dateKey && day.dateKey <= l.end_date
+        );
+        if (leave) dayLeaveColors.set(day.dateKey, leave.color);
+      }
       if (canvasRef.current) {
-        drawCalendar(canvasRef.current, year, month, dayColors, exportTheme);
+        drawCalendar(
+          canvasRef.current,
+          year,
+          month,
+          dayColors,
+          dayLeaveColors,
+          exportTheme
+        );
       }
     } finally {
       setLoading(false);
