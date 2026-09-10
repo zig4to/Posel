@@ -16,7 +16,7 @@ export default async function AppLayout({
     <>
       <SsoHashCleanup />
       <MainNav userEmail={user?.email ?? null} />
-      <main className="mx-auto w-full min-w-0 max-w-5xl flex-1 overflow-x-hidden px-4 py-6">
+      <main className="mx-auto w-full min-w-0 max-w-3xl flex-1 overflow-x-hidden px-4 py-6">
         {children}
       </main>
     </>

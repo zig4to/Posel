@@ -48,7 +48,7 @@ export default function MainNav({ userEmail }: { userEmail: string | null }) {
 
   return (
     <header className="border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-      <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-2 gap-y-1 px-4 py-3">
+      <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-x-2 gap-y-1 px-4 py-3">
         <nav className="flex min-w-0 flex-wrap items-center gap-1">
           {LINKS.map((link) => {
             const isActive =
