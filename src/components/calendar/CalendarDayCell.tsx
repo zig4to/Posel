@@ -3,6 +3,7 @@
 import clsx from "@/lib/utils/clsx";
 import type { CalendarDay } from "@/lib/utils/date";
 import { ColorDot } from "@/components/ui/Badge";
+import EventIcon from "./EventIcon";
 
 export type DayClientSummary = {
   clientId: string;
@@ -16,11 +17,14 @@ const MAX_VISIBLE_DOTS_LARGE = 5;
 export default function CalendarDayCell({
   day,
   clientsForDay,
+  hasEvents = false,
   onClick,
   large = false,
 }: {
   day: CalendarDay;
   clientsForDay: DayClientSummary[];
+  /** Ali ima ta dan vsaj en dogodek (prikaže ikono dogodka). */
+  hasEvents?: boolean;
   onClick: () => void;
   /** Večje kartice, ko so vikend stolpci skriti in dnevi zapolnijo cel zaslon. */
   large?: boolean;
@@ -68,28 +72,38 @@ export default function CalendarDayCell({
           : "border border-transparent bg-gray-50 hover:bg-gray-100 dark:bg-gray-900/40 dark:hover:bg-gray-800"
       )}
     >
-      <span
-        className={clsx(
-          "inline-flex items-center justify-center rounded-full px-1",
-          // Na mobilnem je krogec za današnji dan malenkost manjši kot ostale
-          // oznake dni; na desktopu (sm+) ostane enak kot prej.
-          day.isToday
-            ? large
-              ? "h-5 min-w-[1.25rem] text-xs sm:h-6 sm:min-w-[1.5rem] sm:text-sm"
-              : "h-4 min-w-[1rem] text-[11px] sm:h-5 sm:min-w-[1.25rem] sm:text-xs"
-            : large
-              ? "h-6 min-w-[1.5rem] text-sm"
-              : "h-5 min-w-[1.25rem] text-xs",
-          day.isToday
-            ? // oznaka današnjega dne: poln kroglič v oranžni #F28C28
-              "bg-[#F28C28] font-bold text-white dark:bg-[#F28C28] dark:text-white"
-            : day.isCurrentMonth
-              ? "font-medium text-gray-700 dark:text-gray-300"
-              : "font-medium text-gray-400 dark:text-gray-600"
+      <div className="flex w-full items-center justify-between gap-1">
+        <span
+          className={clsx(
+            "inline-flex items-center justify-center rounded-full px-1",
+            // Na mobilnem je krogec za današnji dan malenkost manjši kot ostale
+            // oznake dni; na desktopu (sm+) ostane enak kot prej.
+            day.isToday
+              ? large
+                ? "h-5 min-w-[1.25rem] text-xs sm:h-6 sm:min-w-[1.5rem] sm:text-sm"
+                : "h-4 min-w-[1rem] text-[11px] sm:h-5 sm:min-w-[1.25rem] sm:text-xs"
+              : large
+                ? "h-6 min-w-[1.5rem] text-sm"
+                : "h-5 min-w-[1.25rem] text-xs",
+            day.isToday
+              ? // oznaka današnjega dne: poln kroglič v oranžni #F28C28
+                "bg-[#F28C28] font-bold text-white dark:bg-[#F28C28] dark:text-white"
+              : day.isCurrentMonth
+                ? "font-medium text-gray-700 dark:text-gray-300"
+                : "font-medium text-gray-400 dark:text-gray-600"
+          )}
+        >
+          {day.date.getDate()}
+        </span>
+        {hasEvents && (
+          <EventIcon
+            className={clsx(
+              "flex-shrink-0 text-amber-500 dark:text-amber-400",
+              large ? "h-4 w-4" : "h-3.5 w-3.5"
+            )}
+          />
         )}
-      >
-        {day.date.getDate()}
-      </span>
+      </div>
       <div className="flex w-full flex-1 flex-col gap-0.5 overflow-hidden">
         {visible.map((c) => (
           <span

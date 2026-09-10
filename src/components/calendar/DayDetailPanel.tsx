@@ -1,45 +1,68 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import type { Client, WorkEntryWithClient } from "@/lib/types/database.types";
+import type {
+  CalendarEvent,
+  Client,
+  WorkEntryWithClient,
+} from "@/lib/types/database.types";
 import Modal from "@/components/ui/Modal";
 import Button from "@/components/ui/Button";
 import { ColorDot } from "@/components/ui/Badge";
 import { formatFullDate, formatTime } from "@/lib/utils/date";
 import { deleteWorkEntryAction } from "@/actions/workEntries";
+import { deleteEventAction } from "@/actions/events";
 import TimeEntryForm from "./TimeEntryForm";
+import EventForm from "./EventForm";
+import EventIcon from "./EventIcon";
 
 type DayDetailPanelProps = {
   date: Date;
   dateKey: string;
   entries: WorkEntryWithClient[];
+  events: CalendarEvent[];
   clients: Client[];
   onClose: () => void;
   onChanged: () => void; // pokliči po vsaki spremembi, da se osveži mesečni prikaz
 };
 
+type Mode =
+  | "list"
+  | "add"
+  | "edit"
+  | "add-event"
+  | "edit-event";
+
+function formatTimeRange(start: string | null, end: string | null): string {
+  if (!start && !end) return "Brez določenih ur";
+  return `${formatTime(start)} – ${formatTime(end)}`;
+}
+
 export default function DayDetailPanel({
   date,
   dateKey,
   entries,
+  events,
   clients,
   onClose,
   onChanged,
 }: DayDetailPanelProps) {
-  const [mode, setMode] = useState<"list" | "add" | "edit">("list");
+  const [mode, setMode] = useState<Mode>("list");
   const [editingEntry, setEditingEntry] = useState<WorkEntryWithClient | null>(
     null
   );
+  const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   function handleSaved() {
     setMode("list");
     setEditingEntry(null);
+    setEditingEvent(null);
     onChanged();
   }
 
-  function handleDelete(entry: WorkEntryWithClient) {
+  function handleDeleteEntry(entry: WorkEntryWithClient) {
     if (!confirm("Izbriši ta vnos?")) return;
     setDeletingId(entry.id);
     startTransition(async () => {
@@ -49,61 +72,137 @@ export default function DayDetailPanel({
     });
   }
 
+  function handleDeleteEvent(event: CalendarEvent) {
+    if (!confirm("Izbriši ta dogodek?")) return;
+    setDeletingId(event.id);
+    startTransition(async () => {
+      await deleteEventAction(event.id);
+      setDeletingId(null);
+      onChanged();
+    });
+  }
+
   return (
     <Modal open onClose={onClose} title={formatFullDate(date)}>
       {mode === "list" && (
-        <div className="space-y-3">
-          {entries.length === 0 ? (
-            <p className="text-sm text-gray-500 dark:text-gray-400">Ni vnosov za ta dan.</p>
-          ) : (
-            <ul className="space-y-2">
-              {entries.map((entry) => (
-                <li
-                  key={entry.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-gray-200 px-3 py-2 dark:border-gray-800"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 text-sm font-medium text-gray-900 dark:text-gray-100">
-                      <ColorDot color={entry.clients?.color ?? "#999"} />
-                      <span className="min-w-0 truncate">
-                        {entry.clients?.company_name ?? "Neznan partner"}
-                      </span>
+        <div className="space-y-4">
+          <section className="space-y-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
+              Stranke
+            </h3>
+            {entries.length === 0 ? (
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Ni vnosov za ta dan.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {entries.map((entry) => (
+                  <li
+                    key={entry.id}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-gray-200 px-3 py-2 dark:border-gray-800"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 text-sm font-medium text-gray-900 dark:text-gray-100">
+                        <ColorDot color={entry.clients?.color ?? "#999"} />
+                        <span className="min-w-0 truncate">
+                          {entry.clients?.company_name ?? "Neznan partner"}
+                        </span>
+                      </div>
+                      <p className="break-words text-xs text-gray-500 dark:text-gray-400">
+                        {formatTimeRange(entry.start_time, entry.end_time)}
+                        {entry.note ? ` · ${entry.note}` : ""}
+                      </p>
                     </div>
-                    <p className="break-words text-xs text-gray-500 dark:text-gray-400">
-                      {entry.start_time || entry.end_time
-                        ? `${formatTime(entry.start_time)} – ${formatTime(entry.end_time)}`
-                        : "Brez določenih ur"}
-                      {entry.note ? ` · ${entry.note}` : ""}
-                    </p>
-                  </div>
-                  <div className="flex flex-shrink-0 gap-1">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={() => {
-                        setEditingEntry(entry);
-                        setMode("edit");
-                      }}
-                    >
-                      Uredi
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      disabled={pending && deletingId === entry.id}
-                      onClick={() => handleDelete(entry)}
-                    >
-                      Izbriši
-                    </Button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
+                    <div className="flex flex-shrink-0 gap-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => {
+                          setEditingEntry(entry);
+                          setMode("edit");
+                        }}
+                      >
+                        Uredi
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        disabled={pending && deletingId === entry.id}
+                        onClick={() => handleDeleteEntry(entry)}
+                      >
+                        Izbriši
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <Button
+              type="button"
+              onClick={() => setMode("add")}
+              className="w-full"
+            >
+              + Dodaj vnos
+            </Button>
+          </section>
 
-          <Button type="button" onClick={() => setMode("add")} className="w-full">
-            + Dodaj vnos
-          </Button>
+          <section className="space-y-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
+              Dogodki
+            </h3>
+            {events.length === 0 ? (
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Ni dogodkov za ta dan.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {events.map((event) => (
+                  <li
+                    key={event.id}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-gray-200 px-3 py-2 dark:border-gray-800"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 text-sm font-medium text-gray-900 dark:text-gray-100">
+                        <EventIcon className="h-4 w-4 flex-shrink-0 text-amber-500 dark:text-amber-400" />
+                        <span className="min-w-0 truncate">{event.title}</span>
+                      </div>
+                      <p className="break-words text-xs text-gray-500 dark:text-gray-400">
+                        {formatTimeRange(event.start_time, event.end_time)}
+                        {event.note ? ` · ${event.note}` : ""}
+                      </p>
+                    </div>
+                    <div className="flex flex-shrink-0 gap-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => {
+                          setEditingEvent(event);
+                          setMode("edit-event");
+                        }}
+                      >
+                        Uredi
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        disabled={pending && deletingId === event.id}
+                        onClick={() => handleDeleteEvent(event)}
+                      >
+                        Izbriši
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <Button
+              type="button"
+              onClick={() => setMode("add-event")}
+              className="w-full"
+            >
+              + Dodaj dogodek
+            </Button>
+          </section>
         </div>
       )}
 
@@ -125,6 +224,26 @@ export default function DayDetailPanel({
           onCancel={() => {
             setMode("list");
             setEditingEntry(null);
+          }}
+        />
+      )}
+
+      {mode === "add-event" && (
+        <EventForm
+          dateKey={dateKey}
+          onSaved={handleSaved}
+          onCancel={() => setMode("list")}
+        />
+      )}
+
+      {mode === "edit-event" && editingEvent && (
+        <EventForm
+          dateKey={dateKey}
+          event={editingEvent}
+          onSaved={handleSaved}
+          onCancel={() => {
+            setMode("list");
+            setEditingEvent(null);
           }}
         />
       )}

@@ -140,6 +140,42 @@ export type Database = {
           updated_at?: string;
         };
       };
+      events: {
+        Relationships: [];
+        Row: {
+          id: string;
+          user_id: string;
+          event_date: string;
+          title: string;
+          start_time: string | null;
+          end_time: string | null;
+          note: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          event_date: string;
+          title: string;
+          start_time?: string | null;
+          end_time?: string | null;
+          note?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          event_date?: string;
+          title?: string;
+          start_time?: string | null;
+          end_time?: string | null;
+          note?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
       monthly_taxes: {
         Relationships: [];
         Row: {
@@ -201,6 +237,13 @@ export type ProjectUpdate =
 export type ProjectWithClient = Project & {
   clients: Pick<Client, "id" | "company_name" | "color"> | null;
 };
+
+// "CalendarEvent" namesto "Event", da se ne prekriva z DOM globalom Event.
+export type CalendarEvent = Database["public"]["Tables"]["events"]["Row"];
+export type CalendarEventInsert =
+  Database["public"]["Tables"]["events"]["Insert"];
+export type CalendarEventUpdate =
+  Database["public"]["Tables"]["events"]["Update"];
 
 export type MonthlyTax = Database["public"]["Tables"]["monthly_taxes"]["Row"];
 export type MonthlyTaxInsert =

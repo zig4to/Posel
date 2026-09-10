@@ -1,9 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { Client, WorkEntryWithClient } from "@/lib/types/database.types";
+import type {
+  CalendarEvent,
+  Client,
+  WorkEntryWithClient,
+} from "@/lib/types/database.types";
 import { createClient } from "@/lib/supabase/client";
 import { getWorkEntriesInRange } from "@/lib/data/workEntries";
+import { getEventsInRange } from "@/lib/data/events";
 import {
   getMonthGrid,
   getMonthRange,
@@ -60,6 +65,7 @@ export default function MonthCalendar({ clients }: { clients: Client[] }) {
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
   const [entries, setEntries] = useState<WorkEntryWithClient[]>([]);
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterClientId, setFilterClientId] = useState<string | null>(null);
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
@@ -76,13 +82,17 @@ export default function MonthCalendar({ clients }: { clients: Client[] }) {
     }
   }, []);
 
-  const loadEntries = useCallback(async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     const supabase = createClient();
     const { from, to } = getMonthRange(year, month);
     try {
-      const data = await getWorkEntriesInRange(supabase, from, to);
-      setEntries(data);
+      const [entryData, eventData] = await Promise.all([
+        getWorkEntriesInRange(supabase, from, to),
+        getEventsInRange(supabase, from, to),
+      ]);
+      setEntries(entryData);
+      setEvents(eventData);
     } finally {
       setLoading(false);
     }
@@ -90,10 +100,10 @@ export default function MonthCalendar({ clients }: { clients: Client[] }) {
 
   useEffect(() => {
     // Standarden podatkovni-fetch-ob-spremembi-odvisnosti vzorec (mesec/leto) -
-    // setState znotraj loadEntries je namerno, gre za sinhronizacijo s Supabase.
+    // setState znotraj loadData je namerno, gre za sinhronizacijo s Supabase.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadEntries();
-  }, [loadEntries]);
+    loadData();
+  }, [loadData]);
 
   // Vsi vnosi po dnevu (neodvisno od filtra) - uporablja se za DayDetailPanel,
   // ki naj vedno prikaže celoten urnik dneva.
@@ -120,6 +130,17 @@ export default function MonthCalendar({ clients }: { clients: Client[] }) {
     }
     return map;
   }, [entriesByDayAll, filterClientId]);
+
+  // Dogodki po dnevu - neodvisno od filtra strank (dogodki nimajo stranke).
+  const eventsByDay = useMemo(() => {
+    const map = new Map<string, CalendarEvent[]>();
+    for (const event of events) {
+      const list = map.get(event.event_date) ?? [];
+      list.push(event);
+      map.set(event.event_date, list);
+    }
+    return map;
+  }, [events]);
 
   const days = useMemo(() => getMonthGrid(year, month), [year, month]);
   // Ko so vikendi skriti, jih izločimo iz mreže, tedni pa ostanejo 5-dnevni.
@@ -207,6 +228,7 @@ export default function MonthCalendar({ clients }: { clients: Client[] }) {
             key={day.dateKey}
             day={day}
             clientsForDay={clientSummaryForDay(day.dateKey)}
+            hasEvents={(eventsByDay.get(day.dateKey)?.length ?? 0) > 0}
             onClick={() => setSelectedDateKey(day.dateKey)}
             large={!showWeekends}
           />
@@ -218,9 +240,10 @@ export default function MonthCalendar({ clients }: { clients: Client[] }) {
           date={selectedDay.date}
           dateKey={selectedDay.dateKey}
           entries={entriesByDayAll.get(selectedDay.dateKey) ?? []}
+          events={eventsByDay.get(selectedDay.dateKey) ?? []}
           clients={clients}
           onClose={() => setSelectedDateKey(null)}
-          onChanged={loadEntries}
+          onChanged={loadData}
         />
       )}
     </div>
