@@ -213,7 +213,7 @@ export default function MonthCalendar({ clients }: { clients: Client[] }) {
             onClick={() => setShowWeekends((v) => !v)}
             aria-label={showWeekends ? "Skrij vikende" : "Pokaži vikende"}
             title={showWeekends ? "Skrij vikende" : "Pokaži vikende"}
-            className="flex-shrink-0"
+            className="flex-shrink-0 max-sm:w-11 max-sm:justify-center"
           >
             {showWeekends ? <PanelRightOpenIcon /> : <PanelRightCloseIcon />}
             <span className="hidden sm:inline">
