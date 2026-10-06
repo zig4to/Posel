@@ -29,7 +29,7 @@ npm install
 npm run dev
 ```
 
-Odpri [http://localhost:3000](http://localhost:3000) — preusmeri te na `/login`. Prijavi se z uporabnikom, ki si ga ustvaril/a v koraku 1.3.
+Odpri [http://localhost:3002](http://localhost:3002) — preusmeri te na `/login`. Prijavi se z uporabnikom, ki si ga ustvaril/a v koraku 1.3.
 
 ### Preverjanje, da vse deluje
 
