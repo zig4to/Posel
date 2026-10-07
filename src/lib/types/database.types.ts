@@ -7,6 +7,9 @@ export type CostItem = {
   note: string | null;
 };
 
+/** Ure po dnevih projekta: "YYYY-MM-DD" -> število ur. */
+export type DayHours = Record<string, number>;
+
 export type Database = {
   public: {
     Tables: {
@@ -110,6 +113,7 @@ export type Database = {
           name: string;
           work_dates: string[];
           cost_items: CostItem[];
+          day_hours: DayHours;
           revenue: number;
           note: string | null;
           created_at: string;
@@ -122,6 +126,7 @@ export type Database = {
           name: string;
           work_dates: string[];
           cost_items?: CostItem[];
+          day_hours?: DayHours;
           revenue?: number;
           note?: string | null;
           created_at?: string;
@@ -134,6 +139,7 @@ export type Database = {
           name?: string;
           work_dates?: string[];
           cost_items?: CostItem[];
+          day_hours?: DayHours;
           revenue?: number;
           note?: string | null;
           created_at?: string;

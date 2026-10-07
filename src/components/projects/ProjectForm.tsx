@@ -20,7 +20,8 @@ import MonthDayPicker from "@/components/projects/MonthDayPicker";
 import { formatEUR } from "@/lib/utils/currency";
 import { createClient } from "@/lib/supabase/client";
 import { getWorkEntriesInRange } from "@/lib/data/workEntries";
-import { getMonthRange } from "@/lib/utils/date";
+import { getMonthRange, SLOVENIAN_WEEKDAYS_SHORT } from "@/lib/utils/date";
+import { formatHours } from "@/lib/utils/projectCosts";
 
 type ProjectFormProps = {
   clients: Client[];
@@ -37,6 +38,21 @@ function initialCostItems(project?: ProjectWithClient): CostItemFields[] {
     }));
   }
   return [{ amount: "", note: "" }];
+}
+
+function initialDayHours(project?: ProjectWithClient): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const [date, hours] of Object.entries(project?.day_hours ?? {})) {
+    result[date] = String(hours);
+  }
+  return result;
+}
+
+/** "YYYY-MM-DD" -> "pon 6." */
+function formatDayLabel(dateKey: string): string {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  const weekday = SLOVENIAN_WEEKDAYS_SHORT[(new Date(y, m - 1, d).getDay() + 6) % 7];
+  return `${weekday} ${d}.`;
 }
 
 function initialMonth(project?: ProjectWithClient): { year: number; month: number } {
@@ -60,6 +76,12 @@ export default function ProjectForm({ clients, project }: ProjectFormProps) {
   );
   const [costItems, setCostItems] = useState<CostItemFields[]>(() =>
     initialCostItems(project)
+  );
+  const [dayHours, setDayHours] = useState<Record<string, string>>(() =>
+    initialDayHours(project)
+  );
+  const [showHours, setShowHours] = useState(
+    () => Object.keys(project?.day_hours ?? {}).length > 0
   );
   const [revenue, setRevenue] = useState(project ? String(project.revenue) : "");
   const [note, setNote] = useState(project?.note ?? "");
@@ -114,6 +136,18 @@ export default function ProjectForm({ clients, project }: ProjectFormProps) {
     const revenueNum = Number(revenue) || 0;
     return revenueNum - totalCosts;
   }, [revenue, totalCosts]);
+
+  const sortedSelectedDates = useMemo(() => [...selectedDates].sort(), [selectedDates]);
+
+  // Seštevek ur samo za trenutno izbrane dni.
+  const totalHours = useMemo(
+    () => sortedSelectedDates.reduce((sum, d) => sum + (Number(dayHours[d]) || 0), 0),
+    [sortedSelectedDates, dayHours]
+  );
+
+  function updateDayHours(dateKey: string, value: string) {
+    setDayHours((prev) => ({ ...prev, [dateKey]: value }));
+  }
 
   function updateCostAmount(index: number, value: string) {
     setCostItems((prev) =>
@@ -205,11 +239,18 @@ export default function ProjectForm({ clients, project }: ProjectFormProps) {
       note: item.note.trim() || null,
     }));
 
+    const day_hours: Record<string, number> = {};
+    for (const date of selectedDates) {
+      const hours = Number(dayHours[date]) || 0;
+      if (hours > 0) day_hours[date] = hours;
+    }
+
     const input: ProjectInput = {
       name: name.trim(),
       client_id: clientId,
       work_dates: [...selectedDates],
       cost_items,
+      day_hours,
       revenue: Number(revenue) || 0,
       note: note.trim() || null,
     };
@@ -274,9 +315,51 @@ export default function ProjectForm({ clients, project }: ProjectFormProps) {
             onAddRange={addRange}
             color={selectedClientColor}
             dayColors={dayColors}
+            hoursActive={showHours}
+            onToggleHours={() => setShowHours((v) => !v)}
           />
         </div>
       </div>
+
+      {showHours && (
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Ure po dnevih
+          </label>
+          {sortedSelectedDates.length === 0 ? (
+            <p className="text-sm text-gray-400 dark:text-gray-500">
+              Najprej izberi dneve projekta.
+            </p>
+          ) : (
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+              {sortedSelectedDates.map((date) => (
+                <div
+                  key={date}
+                  className="rounded-md border border-gray-200 p-2 dark:border-gray-800"
+                >
+                  <label
+                    htmlFor={`hours-${date}`}
+                    className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400"
+                  >
+                    {formatDayLabel(date)}
+                  </label>
+                  <Input
+                    id={`hours-${date}`}
+                    type="number"
+                    inputMode="decimal"
+                    step="0.5"
+                    min="0"
+                    max="24"
+                    placeholder="0"
+                    value={dayHours[date] ?? ""}
+                    onChange={(e) => updateDayHours(date, e.target.value)}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <Field label="Stroški (EUR)" htmlFor="cost-amount-0">
         <div className="space-y-2">
@@ -344,6 +427,15 @@ export default function ProjectForm({ clients, project }: ProjectFormProps) {
           {formatEUR(profit)}
         </span>
       </p>
+
+      {totalHours > 0 && (
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          Ure:{" "}
+          <span className="font-semibold text-gray-900 dark:text-gray-100">
+            {formatHours(totalHours)}
+          </span>
+        </p>
+      )}
 
       <Field label="Opomba" htmlFor="note">
         <Textarea

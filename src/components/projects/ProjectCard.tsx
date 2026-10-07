@@ -7,7 +7,7 @@ import { ColorDot } from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import DeleteProjectButton from "@/components/projects/DeleteProjectButton";
 import { formatEUR } from "@/lib/utils/currency";
-import { sumCostItems } from "@/lib/utils/projectCosts";
+import { formatHours, sumCostItems, sumDayHours } from "@/lib/utils/projectCosts";
 import { SLOVENIAN_MONTHS } from "@/lib/utils/date";
 
 function formatDaysLabel(project: ProjectWithClient): string {
@@ -21,6 +21,7 @@ export default function ProjectCard({ project }: { project: ProjectWithClient })
   const costItems = project.cost_items ?? [];
   const costs = sumCostItems(costItems);
   const profit = project.revenue - costs;
+  const totalHours = sumDayHours(project.day_hours);
   const costNotes = costItems.filter((item) => item.note && item.note.trim());
   const hasNotes = Boolean(project.note) || costNotes.length > 0;
 
@@ -64,6 +65,11 @@ export default function ProjectCard({ project }: { project: ProjectWithClient })
           <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
             {formatEUR(profit)}
           </p>
+          {totalHours > 0 && (
+            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+              Ure: {formatHours(totalHours)}
+            </p>
+          )}
         </div>
       </div>
 

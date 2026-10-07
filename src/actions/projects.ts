@@ -3,13 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import type { CostItem } from "@/lib/types/database.types";
+import type { CostItem, DayHours } from "@/lib/types/database.types";
 
 export type ProjectInput = {
   name: string;
   client_id: string;
   work_dates: string[];
   cost_items: CostItem[];
+  day_hours: DayHours;
   revenue: number;
   note: string | null;
 };
@@ -26,6 +27,16 @@ function cleanCostItems(items: CostItem[]): CostItem[] {
   return items.filter((item) => item.amount > 0 || (item.note && item.note.trim()));
 }
 
+// Obdrži ure samo za izbrane dni projekta in samo vnose z urami > 0.
+function cleanDayHours(dayHours: DayHours, workDates: string[]): DayHours {
+  const dates = new Set(workDates);
+  const result: DayHours = {};
+  for (const [date, hours] of Object.entries(dayHours ?? {})) {
+    if (dates.has(date) && hours > 0) result[date] = hours;
+  }
+  return result;
+}
+
 function validate(input: ProjectInput): string | null {
   if (!input.name.trim()) return "Vnesi ime projekta.";
   if (!input.client_id) return "Izberi partnerja.";
@@ -34,6 +45,9 @@ function validate(input: ProjectInput): string | null {
     return "Stroški ne smejo biti negativni.";
   }
   if (input.revenue < 0) return "Priliv ne sme biti negativen.";
+  if (Object.values(input.day_hours ?? {}).some((h) => !(h >= 0 && h <= 24))) {
+    return "Ure na dan morajo biti med 0 in 24.";
+  }
 
   const dates = normalizeDates(input.work_dates);
   const firstMonth = dates[0].slice(0, 7);
@@ -57,6 +71,7 @@ export async function createProjectAction(
     client_id: input.client_id,
     work_dates: normalizeDates(input.work_dates),
     cost_items: cleanCostItems(input.cost_items),
+    day_hours: cleanDayHours(input.day_hours, input.work_dates),
     revenue: input.revenue,
     note: input.note,
   });
@@ -84,6 +99,7 @@ export async function updateProjectAction(
       client_id: input.client_id,
       work_dates: normalizeDates(input.work_dates),
       cost_items: cleanCostItems(input.cost_items),
+      day_hours: cleanDayHours(input.day_hours, input.work_dates),
       revenue: input.revenue,
       note: input.note,
     })
