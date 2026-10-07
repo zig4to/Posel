@@ -128,20 +128,38 @@ export default async function ProjektiPage() {
                   </div>
                 </div>
 
-                <h3 className="mb-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
-                  Projekti
-                </h3>
+                {monthProjects.length === 0 ? (
+                  <p className="text-sm text-gray-400 dark:text-gray-500">
+                    Ni projektov ta mesec.
+                  </p>
+                ) : (
+                  <details className="group">
+                    <summary className="mb-2 flex cursor-pointer list-none items-center gap-1.5 text-sm font-semibold text-gray-900 select-none dark:text-gray-100 [&::-webkit-details-marker]:hidden">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="h-4 w-4 text-gray-500 transition-transform group-open:rotate-90 dark:text-gray-400"
+                        aria-hidden="true"
+                      >
+                        <path d="m9 18 6-6-6-6" />
+                      </svg>
+                      Projekti
+                      <span className="font-normal text-gray-500 dark:text-gray-400">
+                        ({monthProjects.length})
+                      </span>
+                    </summary>
 
-                <div className="space-y-2">
-                  {monthProjects.length === 0 && (
-                    <p className="text-sm text-gray-400 dark:text-gray-500">
-                      Ni projektov ta mesec.
-                    </p>
-                  )}
-                  {monthProjects.map((project) => (
-                    <ProjectCard key={project.id} project={project} />
-                  ))}
-                </div>
+                    <div className="space-y-2">
+                      {monthProjects.map((project) => (
+                        <ProjectCard key={project.id} project={project} />
+                      ))}
+                    </div>
+                  </details>
+                )}
               </section>
             );
           })}
