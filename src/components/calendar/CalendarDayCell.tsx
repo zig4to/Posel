@@ -41,29 +41,46 @@ export default function CalendarDayCell({
 
   // Obroba in rahel preliv notranjosti celice v barvi (prve) stranke tega dne.
   const clientColor = day.isCurrentMonth ? clientsForDay[0]?.color : undefined;
+  // Ob dveh (ali več) strankah: zgornja polovica celice (ozadje + obroba) v
+  // barvi prve stranke, spodnja polovica v barvi druge.
+  const secondColor = clientColor ? clientsForDay[1]?.color : undefined;
   // Vikend dnevi (sobota/nedelja) dobijo rahlo sivo ozadje za lažje ločevanje.
   const isWeekendShade = day.isCurrentMonth && day.isWeekend && !clientColor;
 
   // Diagonalno šrafiran vzorec (tanke črte z razmikom) za vsak dopust,
   // ki pokriva ta dan - prikaže se na vseh dnevih v obsegu dopusta.
+  const leaveStripeLayers = leaveColorsForDay.map((c, i) => {
+    const angle = i % 2 === 0 ? 45 : 135;
+    // 90% prosojnost (hex alfa E6), tanke ~1px črte z razmikom.
+    return `repeating-linear-gradient(${angle}deg, ${c}E6 0 1px, transparent 1px 9px)`;
+  });
   const leaveStripes =
-    leaveColorsForDay.length > 0
-      ? leaveColorsForDay
-          .map((c, i) => {
-            const angle = i % 2 === 0 ? 45 : 135;
-            // 90% prosojnost (hex alfa E6), tanke ~1px črte z razmikom.
-            return `repeating-linear-gradient(${angle}deg, ${c}E6 0 1px, transparent 1px 9px)`;
-          })
-          .join(", ")
-      : undefined;
+    leaveStripeLayers.length > 0 ? leaveStripeLayers.join(", ") : undefined;
 
   const style: CSSProperties = {};
-  if (clientColor) {
-    style.borderColor = clientColor;
-    style.backgroundColor = `${clientColor}26`;
-  }
-  if (leaveStripes) {
-    style.backgroundImage = leaveStripes;
+  if (clientColor && secondColor) {
+    // Deljena obroba: prozorna obroba + plasti ozadja. Spodnja plast
+    // (border-box) nariše obrobo v dveh barvah, nad njo neprozorna podlaga
+    // celice in prosojni barvni odtenek (padding-box). Tako ostanejo
+    // zaobljeni robovi pravilni.
+    const tint = `linear-gradient(to bottom, ${clientColor}26 50%, ${secondColor}26 50%) padding-box`;
+    const base = "linear-gradient(var(--cell-bg), var(--cell-bg)) padding-box";
+    const border = `linear-gradient(to bottom, ${clientColor} 50%, ${secondColor} 50%) border-box`;
+    style.borderColor = "transparent";
+    style.background = [
+      ...leaveStripeLayers.map((l) => `${l} padding-box`),
+      tint,
+      base,
+      border,
+    ].join(", ");
+  } else {
+    if (clientColor) {
+      style.borderColor = clientColor;
+      style.backgroundColor = `${clientColor}26`;
+    }
+    if (leaveStripes) {
+      style.backgroundImage = leaveStripes;
+    }
   }
 
   return (
@@ -90,7 +107,7 @@ export default function CalendarDayCell({
         large ? "sm:h-36" : "sm:h-24",
         day.isCurrentMonth
           ? clientColor
-            ? "border-2 bg-white hover:brightness-95 dark:bg-gray-900 dark:hover:brightness-110"
+            ? "border-2 bg-white [--cell-bg:var(--color-white)] hover:brightness-95 dark:bg-gray-900 dark:[--cell-bg:var(--color-gray-900)] dark:hover:brightness-110"
             : isWeekendShade
               ? "border border-gray-200 bg-gray-100 hover:border-blue-300 hover:bg-blue-50/40 dark:border-gray-800 dark:bg-gray-800/50 dark:hover:border-blue-800 dark:hover:bg-blue-950/40"
               : "border border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50/40 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-blue-800 dark:hover:bg-blue-950/40"
