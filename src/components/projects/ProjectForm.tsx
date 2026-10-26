@@ -15,20 +15,55 @@ import {
 } from "@/actions/projects";
 import { Field, Input, Textarea } from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
+import Collapsible from "@/components/ui/Collapsible";
 import MonthYearPicker from "@/components/calendar/MonthYearPicker";
 import MonthDayPicker from "@/components/projects/MonthDayPicker";
 import { formatEUR } from "@/lib/utils/currency";
 import { createClient } from "@/lib/supabase/client";
 import { getWorkEntriesInRange } from "@/lib/data/workEntries";
 import { getMonthRange, SLOVENIAN_WEEKDAYS_SHORT } from "@/lib/utils/date";
-import { formatHours } from "@/lib/utils/projectCosts";
+import {
+  DEFAULT_FUEL_CONSUMPTION,
+  FUEL_ROUTES,
+  formatHours,
+  formatKm,
+  fuelCost,
+  fuelLiters,
+  type FuelRoute,
+} from "@/lib/utils/projectCosts";
+
+const ROUTE_CHIP_CLASS =
+  "rounded-full border border-gray-300 bg-white px-2.5 py-1 text-xs text-gray-700 hover:border-blue-400 hover:bg-blue-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-blue-700 dark:hover:bg-blue-950/40";
 
 type ProjectFormProps = {
   clients: Client[];
   project?: ProjectWithClient; // če je podan, gre za urejanje
+  /** Trenutna cena dizla (EUR/l) z goriva.si; null, če je ni bilo mogoče pridobiti. */
+  dieselPrice: number | null;
 };
 
 type CostItemFields = { amount: string; note: string };
+
+type Billing = "hourly" | "fixed";
+
+const BILLING_OPTIONS: { value: Billing; label: string }[] = [
+  { value: "hourly", label: "Na uro" },
+  { value: "fixed", label: "Na projekt" },
+];
+
+const SECTION_LABEL_CLASS =
+  "mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300";
+
+const DAY_CELL_LABEL_CLASS =
+  "mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400";
+
+const DAY_GRID_CLASS = "grid grid-cols-3 gap-2 sm:grid-cols-5";
+
+const NO_DAYS_HINT = (
+  <p className="text-sm text-gray-400 dark:text-gray-500">
+    Najprej izberi dneve projekta.
+  </p>
+);
 
 function initialCostItems(project?: ProjectWithClient): CostItemFields[] {
   if (project && (project.cost_items ?? []).length > 0) {
@@ -40,10 +75,10 @@ function initialCostItems(project?: ProjectWithClient): CostItemFields[] {
   return [{ amount: "", note: "" }];
 }
 
-function initialDayHours(project?: ProjectWithClient): Record<string, string> {
+function toFieldValues(values: Record<string, number> | undefined): Record<string, string> {
   const result: Record<string, string> = {};
-  for (const [date, hours] of Object.entries(project?.day_hours ?? {})) {
-    result[date] = String(hours);
+  for (const [date, value] of Object.entries(values ?? {})) {
+    result[date] = String(value);
   }
   return result;
 }
@@ -64,7 +99,7 @@ function initialMonth(project?: ProjectWithClient): { year: number; month: numbe
   return { year: now.getFullYear(), month: now.getMonth() };
 }
 
-export default function ProjectForm({ clients, project }: ProjectFormProps) {
+export default function ProjectForm({ clients, project, dieselPrice }: ProjectFormProps) {
   const router = useRouter();
   const [name, setName] = useState(project?.name ?? "");
   const [clientId, setClientId] = useState(
@@ -78,10 +113,32 @@ export default function ProjectForm({ clients, project }: ProjectFormProps) {
     initialCostItems(project)
   );
   const [dayHours, setDayHours] = useState<Record<string, string>>(() =>
-    initialDayHours(project)
+    toFieldValues(project?.day_hours)
   );
-  const [showHours, setShowHours] = useState(
-    () => Object.keys(project?.day_hours ?? {}).length > 0
+  const [dayKm, setDayKm] = useState<Record<string, string>>(() =>
+    toFieldValues(project?.day_km)
+  );
+  // Relacija, ki jo uporabnik trenutno dodeljuje posameznim dnem (klik na dan).
+  const [pickingRoute, setPickingRoute] = useState<FuelRoute | null>(null);
+  const [fuelConsumption, setFuelConsumption] = useState(
+    String(project?.fuel_consumption ?? DEFAULT_FUEL_CONSUMPTION)
+  );
+  // Obstoječi projekt obdrži ceno ob vnosu; nov projekt vzame trenutno ceno.
+  const [fuelPrice, setFuelPrice] = useState(() => {
+    const price = project?.fuel_price ?? dieselPrice;
+    return price != null ? String(price) : "";
+  });
+  // Obračun: "na uro" (ure po dnevih × cena na uro) ali "na projekt" (ročen
+  // priliv). Obstoječ projekt z urami ali urno postavko se odpre na uro.
+  const [billing, setBilling] = useState<Billing>(() =>
+    !project ||
+    project.hourly_rate != null ||
+    Object.keys(project.day_hours ?? {}).length > 0
+      ? "hourly"
+      : "fixed"
+  );
+  const [hourlyRate, setHourlyRate] = useState(
+    project?.hourly_rate != null ? String(project.hourly_rate) : ""
   );
   const [revenue, setRevenue] = useState(project ? String(project.revenue) : "");
   const [note, setNote] = useState(project?.note ?? "");
@@ -127,17 +184,22 @@ export default function ProjectForm({ clients, project }: ProjectFormProps) {
     return map;
   }, [monthEntries]);
 
-  const totalCosts = useMemo(
+  const sortedSelectedDates = useMemo(() => [...selectedDates].sort(), [selectedDates]);
+
+  // Gorivo: km po izbranih dnevih × poraba × cena dizla.
+  const totalKm = useMemo(
+    () => sortedSelectedDates.reduce((sum, d) => sum + (Number(dayKm[d]) || 0), 0),
+    [sortedSelectedDates, dayKm]
+  );
+  const consumptionNum = Number(fuelConsumption) || 0;
+  const fuelPriceNum = Number(fuelPrice) || 0;
+  const totalFuelCost = fuelCost(totalKm, consumptionNum, fuelPriceNum);
+
+  const otherCosts = useMemo(
     () => costItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0),
     [costItems]
   );
-
-  const profit = useMemo(() => {
-    const revenueNum = Number(revenue) || 0;
-    return revenueNum - totalCosts;
-  }, [revenue, totalCosts]);
-
-  const sortedSelectedDates = useMemo(() => [...selectedDates].sort(), [selectedDates]);
+  const totalCosts = otherCosts + totalFuelCost;
 
   // Seštevek ur samo za trenutno izbrane dni.
   const totalHours = useMemo(
@@ -145,8 +207,38 @@ export default function ProjectForm({ clients, project }: ProjectFormProps) {
     [sortedSelectedDates, dayHours]
   );
 
+  // Na uro: priliv = vrednost projekta (ure × cena na uro); na projekt: ročen.
+  const rateNum = Number(hourlyRate) || 0;
+  const projectValue = Math.round(totalHours * rateNum * 100) / 100;
+  const effectiveRevenue = billing === "hourly" ? projectValue : Number(revenue) || 0;
+
+  const profit = effectiveRevenue - totalCosts;
+
   function updateDayHours(dateKey: string, value: string) {
     setDayHours((prev) => ({ ...prev, [dateKey]: value }));
+  }
+
+  function updateDayKm(dateKey: string, value: string) {
+    setDayKm((prev) => ({ ...prev, [dateKey]: value }));
+  }
+
+  // Predefinirana relacija: enaki km za vse izbrane dni (posamezen dan se
+  // lahko nato še ročno popravi).
+  function applyRouteToAllDays(km: number) {
+    setDayKm((prev) => {
+      const next = { ...prev };
+      for (const date of sortedSelectedDates) next[date] = String(km);
+      return next;
+    });
+  }
+
+  // Način "Posamezni dnevi": klik na dan mu dodeli km relacije, ponoven klik
+  // jih odstrani.
+  function toggleRouteDay(dateKey: string, km: number) {
+    setDayKm((prev) => ({
+      ...prev,
+      [dateKey]: prev[dateKey] === String(km) ? "" : String(km),
+    }));
   }
 
   function updateCostAmount(index: number, value: string) {
@@ -239,10 +331,28 @@ export default function ProjectForm({ clients, project }: ProjectFormProps) {
       note: item.note.trim() || null,
     }));
 
+    // Na projekt: ur in urne postavke ne shranjujemo.
     const day_hours: Record<string, number> = {};
+    if (billing === "hourly") {
+      if (hourlyRate.trim() === "" || !(rateNum >= 0)) {
+        setError("Vnesi ceno na uro.");
+        return;
+      }
+      for (const date of selectedDates) {
+        const hours = Number(dayHours[date]) || 0;
+        if (hours > 0) day_hours[date] = hours;
+      }
+    }
+
+    const day_km: Record<string, number> = {};
     for (const date of selectedDates) {
-      const hours = Number(dayHours[date]) || 0;
-      if (hours > 0) day_hours[date] = hours;
+      const km = Number(dayKm[date]) || 0;
+      if (km > 0) day_km[date] = km;
+    }
+    const hasFuel = Object.keys(day_km).length > 0;
+    if (hasFuel && !(fuelPriceNum > 0)) {
+      setError("Vnesi ceno dizla.");
+      return;
     }
 
     const input: ProjectInput = {
@@ -251,7 +361,11 @@ export default function ProjectForm({ clients, project }: ProjectFormProps) {
       work_dates: [...selectedDates],
       cost_items,
       day_hours,
-      revenue: Number(revenue) || 0,
+      hourly_rate: billing === "hourly" ? rateNum : null,
+      day_km,
+      fuel_consumption: hasFuel ? consumptionNum : null,
+      fuel_price: hasFuel ? fuelPriceNum : null,
+      revenue: effectiveRevenue,
       note: note.trim() || null,
     };
 
@@ -302,9 +416,7 @@ export default function ProjectForm({ clients, project }: ProjectFormProps) {
       </Field>
 
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-          Dnevi projekta
-        </label>
+        <span className={SECTION_LABEL_CLASS}>Dnevi projekta</span>
         <div className="space-y-3 rounded-md border border-gray-200 p-3 dark:border-gray-800">
           <MonthYearPicker year={year} month={month} onChange={handleYearMonthChange} />
           <MonthDayPicker
@@ -315,63 +427,292 @@ export default function ProjectForm({ clients, project }: ProjectFormProps) {
             onAddRange={addRange}
             color={selectedClientColor}
             dayColors={dayColors}
-            hoursActive={showHours}
-            onToggleHours={() => setShowHours((v) => !v)}
           />
         </div>
       </div>
 
-      {showHours && (
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Ure po dnevih
-          </label>
-          {sortedSelectedDates.length === 0 ? (
-            <p className="text-sm text-gray-400 dark:text-gray-500">
-              Najprej izberi dneve projekta.
-            </p>
+      {/* Obračun: na uro (ure × cena na uro) ali na projekt (ročen priliv). */}
+      <div>
+        <span className={SECTION_LABEL_CLASS}>Obračun</span>
+        <div className="space-y-3 rounded-md border border-gray-200 p-3 dark:border-gray-800">
+          <div
+            role="radiogroup"
+            aria-label="Način obračuna"
+            className="grid grid-cols-2 gap-1 rounded-md bg-gray-100 p-1 dark:bg-gray-800"
+          >
+            {BILLING_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                role="radio"
+                aria-checked={billing === option.value}
+                onClick={() => setBilling(option.value)}
+                className={
+                  "rounded px-3 py-1.5 text-sm font-medium transition-colors " +
+                  (billing === option.value
+                    ? "bg-white text-gray-900 shadow-sm dark:bg-gray-900 dark:text-gray-100"
+                    : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200")
+                }
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+
+          {billing === "hourly" ? (
+            <>
+              <div className="w-40">
+                <Field label="Cena na uro (EUR)" htmlFor="hourly_rate">
+                  <Input
+                    id="hourly_rate"
+                    type="number"
+                    inputMode="decimal"
+                    step="0.01"
+                    min="0"
+                    placeholder="npr. 25"
+                    value={hourlyRate}
+                    onChange={(e) => setHourlyRate(e.target.value)}
+                  />
+                </Field>
+              </div>
+
+              <div>
+                <span className={SECTION_LABEL_CLASS}>Ure po dnevih</span>
+                {sortedSelectedDates.length === 0 ? (
+                  NO_DAYS_HINT
+                ) : (
+                  <div className={DAY_GRID_CLASS}>
+                    {sortedSelectedDates.map((date) => (
+                      <div
+                        key={date}
+                        className="rounded-md border border-gray-200 p-2 dark:border-gray-800"
+                      >
+                        <label htmlFor={`hours-${date}`} className={DAY_CELL_LABEL_CLASS}>
+                          {formatDayLabel(date)}
+                        </label>
+                        <Input
+                          id={`hours-${date}`}
+                          type="number"
+                          inputMode="decimal"
+                          step="0.5"
+                          min="0"
+                          max="24"
+                          placeholder="0"
+                          value={dayHours[date] ?? ""}
+                          onChange={(e) => updateDayHours(date, e.target.value)}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                {formatHours(totalHours)} × {formatEUR(rateNum)}/h ={" "}
+                <span className="font-semibold text-gray-900 dark:text-gray-100">
+                  {formatEUR(projectValue)}
+                </span>
+              </p>
+            </>
           ) : (
-            <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+            <Field label="Priliv (EUR)" htmlFor="revenue">
+              <Input
+                id="revenue"
+                type="number"
+                inputMode="decimal"
+                step="0.01"
+                min="0"
+                value={revenue}
+                onChange={(e) => setRevenue(e.target.value)}
+              />
+            </Field>
+          )}
+        </div>
+      </div>
+
+      <Collapsible
+        title="Stroški"
+        summary={formatEUR(totalCosts)}
+        defaultOpen={totalCosts > 0}
+      >
+        <Collapsible
+          nested
+          title="Gorivo (dizel)"
+          summary={
+            totalKm > 0
+              ? `${formatKm(totalKm)} · ${formatEUR(totalFuelCost)}`
+              : formatEUR(0)
+          }
+          defaultOpen={totalKm > 0}
+        >
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Poraba (l/100 km)" htmlFor="fuel_consumption">
+              <Input
+                id="fuel_consumption"
+                type="number"
+                inputMode="decimal"
+                step="0.1"
+                min="0"
+                value={fuelConsumption}
+                onChange={(e) => setFuelConsumption(e.target.value)}
+              />
+            </Field>
+            <Field label="Cena dizla (EUR/l)" htmlFor="fuel_price">
+              <Input
+                id="fuel_price"
+                type="number"
+                inputMode="decimal"
+                step="0.001"
+                min="0"
+                value={fuelPrice}
+                onChange={(e) => setFuelPrice(e.target.value)}
+              />
+            </Field>
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Poraba: VW Passat 2.0 TDI (2008), povprečje.{" "}
+            {dieselPrice == null ? (
+              "Trenutne cene dizla ni bilo mogoče pridobiti, vnesi jo ročno."
+            ) : fuelPriceNum === dieselPrice ? (
+              "Cena je trenutna (goriva.si)."
+            ) : (
+              <>
+                Trenutna cena: {dieselPrice.toLocaleString("sl-SI")} €/l{" "}
+                <button
+                  type="button"
+                  className="font-medium text-blue-600 hover:underline dark:text-blue-400"
+                  onClick={() => setFuelPrice(String(dieselPrice))}
+                >
+                  Uporabi
+                </button>
+              </>
+            )}
+          </p>
+
+          {sortedSelectedDates.length > 0 &&
+            (pickingRoute ? (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-blue-50 px-2.5 py-1.5 dark:bg-blue-950/40">
+                <span className="text-xs text-blue-700 dark:text-blue-300">
+                  Klikni dneve za relacijo {pickingRoute.label} (
+                  {formatKm(pickingRoute.km)})
+                </span>
+                <button
+                  type="button"
+                  className={ROUTE_CHIP_CLASS}
+                  onClick={() => setPickingRoute(null)}
+                >
+                  Končano
+                </button>
+              </div>
+            ) : (
+              FUEL_ROUTES.map((route) => (
+                <div key={route.label} className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    {route.label} ({formatKm(route.km)}):
+                  </span>
+                  <button
+                    type="button"
+                    className={ROUTE_CHIP_CLASS}
+                    onClick={() => applyRouteToAllDays(route.km)}
+                  >
+                    Vsi dnevi
+                  </button>
+                  <button
+                    type="button"
+                    className={ROUTE_CHIP_CLASS}
+                    onClick={() => setPickingRoute(route)}
+                  >
+                    Posamezni dnevi
+                  </button>
+                </div>
+              ))
+            ))}
+
+          {sortedSelectedDates.length === 0 ? (
+            NO_DAYS_HINT
+          ) : pickingRoute ? (
+            <div className={DAY_GRID_CLASS}>
+              {sortedSelectedDates.map((date) => {
+                const assigned = dayKm[date] === String(pickingRoute.km);
+                return (
+                  <button
+                    key={date}
+                    type="button"
+                    aria-pressed={assigned}
+                    onClick={() => toggleRouteDay(date, pickingRoute.km)}
+                    className={
+                      "rounded-md border-2 p-2 text-left transition-colors " +
+                      (assigned
+                        ? "border-blue-500 bg-blue-50 dark:bg-blue-950/40"
+                        : "border-gray-200 bg-white hover:border-blue-300 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-blue-800")
+                    }
+                  >
+                    <span className="block text-xs font-medium text-gray-600 dark:text-gray-400">
+                      {formatDayLabel(date)}
+                    </span>
+                    <span className="block text-sm text-gray-900 dark:text-gray-100">
+                      {dayKm[date] ? formatKm(Number(dayKm[date]) || 0) : "–"}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className={DAY_GRID_CLASS}>
               {sortedSelectedDates.map((date) => (
                 <div
                   key={date}
-                  className="rounded-md border border-gray-200 p-2 dark:border-gray-800"
+                  className="rounded-md border border-gray-200 bg-white p-2 dark:border-gray-800 dark:bg-gray-900"
                 >
-                  <label
-                    htmlFor={`hours-${date}`}
-                    className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400"
-                  >
+                  <label htmlFor={`km-${date}`} className={DAY_CELL_LABEL_CLASS}>
                     {formatDayLabel(date)}
                   </label>
                   <Input
-                    id={`hours-${date}`}
+                    id={`km-${date}`}
                     type="number"
                     inputMode="decimal"
-                    step="0.5"
+                    step="1"
                     min="0"
-                    max="24"
-                    placeholder="0"
-                    value={dayHours[date] ?? ""}
-                    onChange={(e) => updateDayHours(date, e.target.value)}
+                    placeholder="km"
+                    value={dayKm[date] ?? ""}
+                    onChange={(e) => updateDayKm(date, e.target.value)}
                   />
                 </div>
               ))}
             </div>
           )}
-        </div>
-      )}
 
-      <Field label="Stroški (EUR)" htmlFor="cost-amount-0">
-        <div className="space-y-2">
+          {totalKm > 0 && (
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              {formatKm(totalKm)} ·{" "}
+              {fuelLiters(totalKm, consumptionNum).toLocaleString("sl-SI", {
+                maximumFractionDigits: 1,
+              })}{" "}
+              l ·{" "}
+              <span className="font-semibold text-gray-900 dark:text-gray-100">
+                {formatEUR(totalFuelCost)}
+              </span>
+            </p>
+          )}
+        </Collapsible>
+
+        <Collapsible
+          nested
+          title="Ostali stroški"
+          summary={formatEUR(otherCosts)}
+          defaultOpen={otherCosts > 0}
+        >
           {costItems.map((item, index) => (
             <div key={index} className="flex items-center gap-2">
               <div className="w-24 flex-shrink-0">
                 <Input
                   id={`cost-amount-${index}`}
                   type="number"
+                  inputMode="decimal"
                   step="0.01"
                   min="0"
                   placeholder="Znesek"
+                  aria-label="Znesek stroška"
                   value={item.amount}
                   onChange={(e) => updateCostAmount(index, e.target.value)}
                 />
@@ -380,6 +721,7 @@ export default function ProjectForm({ clients, project }: ProjectFormProps) {
                 <Input
                   id={`cost-note-${index}`}
                   placeholder="Opomba"
+                  aria-label="Opomba stroška"
                   value={item.note}
                   onChange={(e) => updateCostNote(index, e.target.value)}
                 />
@@ -407,35 +749,35 @@ export default function ProjectForm({ clients, project }: ProjectFormProps) {
               )}
             </div>
           ))}
+        </Collapsible>
+      </Collapsible>
+
+      {/* Povzetek projekta - enaka razdelitev kot na kartici projekta. */}
+      <div className="grid grid-cols-3 gap-2 rounded-md border border-gray-200 border-l-4 border-l-blue-500 p-3 dark:border-gray-800 dark:border-l-blue-500">
+        <div>
+          <p className="text-xs text-gray-500 dark:text-gray-400">Priliv</p>
+          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+            {formatEUR(effectiveRevenue)}
+          </p>
         </div>
-      </Field>
-
-      <Field label="Priliv (EUR)" htmlFor="revenue">
-        <Input
-          id="revenue"
-          type="number"
-          step="0.01"
-          min="0"
-          value={revenue}
-          onChange={(e) => setRevenue(e.target.value)}
-        />
-      </Field>
-
-      <p className="text-sm text-gray-600 dark:text-gray-400">
-        Dobiček:{" "}
-        <span className="font-semibold text-gray-900 dark:text-gray-100">
-          {formatEUR(profit)}
-        </span>
-      </p>
-
-      {totalHours > 0 && (
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          Ure:{" "}
-          <span className="font-semibold text-gray-900 dark:text-gray-100">
-            {formatHours(totalHours)}
-          </span>
-        </p>
-      )}
+        <div>
+          <p className="text-xs text-gray-500 dark:text-gray-400">Stroški</p>
+          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+            {formatEUR(totalCosts)}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs text-gray-500 dark:text-gray-400">Dobiček</p>
+          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+            {formatEUR(profit)}
+          </p>
+          {billing === "hourly" && totalHours > 0 && (
+            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+              Ure: {formatHours(totalHours)}
+            </p>
+          )}
+        </div>
+      </div>
 
       <Field label="Opomba" htmlFor="note">
         <Textarea

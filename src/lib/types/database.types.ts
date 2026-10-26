@@ -9,6 +9,8 @@ export type CostItem = {
 
 /** Ure po dnevih projekta: "YYYY-MM-DD" -> število ur. */
 export type DayHours = Record<string, number>;
+/** Prevoženi km po dnevih projekta: { "YYYY-MM-DD": km }. */
+export type DayKm = Record<string, number>;
 
 export type Database = {
   public: {
@@ -114,6 +116,10 @@ export type Database = {
           work_dates: string[];
           cost_items: CostItem[];
           day_hours: DayHours;
+          hourly_rate: number | null;
+          day_km: DayKm;
+          fuel_consumption: number | null;
+          fuel_price: number | null;
           revenue: number;
           note: string | null;
           created_at: string;
@@ -127,6 +133,10 @@ export type Database = {
           work_dates: string[];
           cost_items?: CostItem[];
           day_hours?: DayHours;
+          hourly_rate?: number | null;
+          day_km?: DayKm;
+          fuel_consumption?: number | null;
+          fuel_price?: number | null;
           revenue?: number;
           note?: string | null;
           created_at?: string;
@@ -140,6 +150,10 @@ export type Database = {
           work_dates?: string[];
           cost_items?: CostItem[];
           day_hours?: DayHours;
+          hourly_rate?: number | null;
+          day_km?: DayKm;
+          fuel_consumption?: number | null;
+          fuel_price?: number | null;
           revenue?: number;
           note?: string | null;
           created_at?: string;

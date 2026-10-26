@@ -8,7 +8,7 @@ import ProjectCard from "@/components/projects/ProjectCard";
 import TaxObligationsButton from "@/components/projects/TaxObligationsButton";
 import { formatEUR } from "@/lib/utils/currency";
 import { SLOVENIAN_MONTHS } from "@/lib/utils/date";
-import { sumCostItems } from "@/lib/utils/projectCosts";
+import { projectTotalCosts } from "@/lib/utils/projectCosts";
 import type { ProjectWithClient } from "@/lib/types/database.types";
 
 function pad2(n: number): string {
@@ -76,7 +76,7 @@ export default async function ProjektiPage() {
             const tax = taxByMonth.get(key) ?? 0;
             const totals = monthProjects.reduce(
               (acc, p) => {
-                const costs = sumCostItems(p.cost_items);
+                const costs = projectTotalCosts(p);
                 return {
                   costs: acc.costs + costs,
                   revenue: acc.revenue + p.revenue,

@@ -7,7 +7,14 @@ import { ColorDot } from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import DeleteProjectButton from "@/components/projects/DeleteProjectButton";
 import { formatEUR } from "@/lib/utils/currency";
-import { formatHours, sumCostItems, sumDayHours } from "@/lib/utils/projectCosts";
+import {
+  formatHours,
+  formatKm,
+  projectFuelCost,
+  projectTotalCosts,
+  sumDayHours,
+  sumDayKm,
+} from "@/lib/utils/projectCosts";
 import { SLOVENIAN_MONTHS } from "@/lib/utils/date";
 
 function formatDaysLabel(project: ProjectWithClient): string {
@@ -19,7 +26,9 @@ function formatDaysLabel(project: ProjectWithClient): string {
 export default function ProjectCard({ project }: { project: ProjectWithClient }) {
   const [showNotes, setShowNotes] = useState(false);
   const costItems = project.cost_items ?? [];
-  const costs = sumCostItems(costItems);
+  const costs = projectTotalCosts(project);
+  const fuel = projectFuelCost(project);
+  const totalKm = sumDayKm(project.day_km);
   const profit = project.revenue - costs;
   const totalHours = sumDayHours(project.day_hours);
   const costNotes = costItems.filter((item) => item.note && item.note.trim());
@@ -53,6 +62,11 @@ export default function ProjectCard({ project }: { project: ProjectWithClient })
           <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
             {formatEUR(costs)}
           </p>
+          {fuel > 0 && (
+            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+              Gorivo: {formatEUR(fuel)} ({formatKm(totalKm)})
+            </p>
+          )}
         </div>
         <div>
           <p className="text-xs text-gray-500 dark:text-gray-400">Priliv</p>
@@ -68,6 +82,8 @@ export default function ProjectCard({ project }: { project: ProjectWithClient })
           {totalHours > 0 && (
             <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
               Ure: {formatHours(totalHours)}
+              {project.hourly_rate != null &&
+                ` × ${formatEUR(project.hourly_rate)}/h`}
             </p>
           )}
         </div>

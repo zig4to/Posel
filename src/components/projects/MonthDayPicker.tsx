@@ -20,8 +20,6 @@ type MonthDayPickerProps = {
   /** dateKey -> barva stranke, ki ima ta dan že vnos v koledarju (isto kot na zavihku Koledar). */
   dayColors: Map<string, string>;
   /** Ali je prikazan vnos ur po dnevih (gumb "Beleži ure"). */
-  hoursActive: boolean;
-  onToggleHours: () => void;
 };
 
 export default function MonthDayPicker({
@@ -32,8 +30,6 @@ export default function MonthDayPicker({
   onAddRange,
   color,
   dayColors,
-  hoursActive,
-  onToggleHours,
 }: MonthDayPickerProps) {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
@@ -151,16 +147,14 @@ export default function MonthDayPicker({
         </div>
       ) : (
         <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="secondary" onClick={() => setShowRangeForm(true)}>
-            Razpon
-          </Button>
+          {/* Na telefonu nižji gumb (manj navpičnega odmika), na sm+ kot prej. */}
           <Button
             type="button"
-            variant={hoursActive ? "primary" : "secondary"}
-            onClick={onToggleHours}
-            aria-pressed={hoursActive}
+            variant="secondary"
+            className="max-sm:py-1 max-sm:text-xs"
+            onClick={() => setShowRangeForm(true)}
           >
-            Beleži ure
+            Razpon
           </Button>
         </div>
       )}

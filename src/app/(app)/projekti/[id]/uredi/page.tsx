@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getProjectById } from "@/lib/data/projects";
 import { getClients } from "@/lib/data/clients";
 import ProjectForm from "@/components/projects/ProjectForm";
+import { getCurrentDieselPrice } from "@/lib/fuel";
 
 export default async function UrediProjektPage({
   params,
@@ -19,7 +20,10 @@ export default async function UrediProjektPage({
     notFound();
   }
 
-  const clients = await getClients(supabase);
+  const [clients, dieselPrice] = await Promise.all([
+    getClients(supabase),
+    getCurrentDieselPrice(),
+  ]);
 
   return (
     <div className="mx-auto max-w-lg">
@@ -27,7 +31,7 @@ export default async function UrediProjektPage({
         Uredi projekt
       </h1>
       <div className="rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
-        <ProjectForm clients={clients} project={project} />
+        <ProjectForm dieselPrice={dieselPrice} clients={clients} project={project} />
       </div>
     </div>
   );

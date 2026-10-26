@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import type { CostItem, DayHours } from "@/lib/types/database.types";
+import type { CostItem, DayHours, DayKm } from "@/lib/types/database.types";
 
 export type ProjectInput = {
   name: string;
@@ -11,6 +11,10 @@ export type ProjectInput = {
   work_dates: string[];
   cost_items: CostItem[];
   day_hours: DayHours;
+  hourly_rate: number | null;
+  day_km: DayKm;
+  fuel_consumption: number | null;
+  fuel_price: number | null;
   revenue: number;
   note: string | null;
 };
@@ -27,12 +31,12 @@ function cleanCostItems(items: CostItem[]): CostItem[] {
   return items.filter((item) => item.amount > 0 || (item.note && item.note.trim()));
 }
 
-// Obdrži ure samo za izbrane dni projekta in samo vnose z urami > 0.
-function cleanDayHours(dayHours: DayHours, workDates: string[]): DayHours {
+// Obdrži vrednosti (ure/km) samo za izbrane dni projekta in samo vnose > 0.
+function cleanPerDay(values: Record<string, number>, workDates: string[]): Record<string, number> {
   const dates = new Set(workDates);
-  const result: DayHours = {};
-  for (const [date, hours] of Object.entries(dayHours ?? {})) {
-    if (dates.has(date) && hours > 0) result[date] = hours;
+  const result: Record<string, number> = {};
+  for (const [date, value] of Object.entries(values ?? {})) {
+    if (dates.has(date) && value > 0) result[date] = value;
   }
   return result;
 }
@@ -45,6 +49,17 @@ function validate(input: ProjectInput): string | null {
     return "Stroški ne smejo biti negativni.";
   }
   if (input.revenue < 0) return "Priliv ne sme biti negativen.";
+  if (input.hourly_rate !== null && !(input.hourly_rate >= 0)) {
+    return "Cena na uro ne sme biti negativna.";
+  }
+  if (Object.values(input.day_km ?? {}).some((km) => !(km >= 0))) {
+    return "Kilometri ne smejo biti negativni.";
+  }
+  if (
+    [input.fuel_consumption, input.fuel_price].some((v) => v !== null && !(v >= 0))
+  ) {
+    return "Poraba in cena goriva ne smeta biti negativni.";
+  }
   if (Object.values(input.day_hours ?? {}).some((h) => !(h >= 0 && h <= 24))) {
     return "Ure na dan morajo biti med 0 in 24.";
   }
@@ -71,7 +86,11 @@ export async function createProjectAction(
     client_id: input.client_id,
     work_dates: normalizeDates(input.work_dates),
     cost_items: cleanCostItems(input.cost_items),
-    day_hours: cleanDayHours(input.day_hours, input.work_dates),
+    day_hours: cleanPerDay(input.day_hours, input.work_dates),
+    hourly_rate: input.hourly_rate,
+    day_km: cleanPerDay(input.day_km, input.work_dates),
+    fuel_consumption: input.fuel_consumption,
+    fuel_price: input.fuel_price,
     revenue: input.revenue,
     note: input.note,
   });
@@ -99,7 +118,11 @@ export async function updateProjectAction(
       client_id: input.client_id,
       work_dates: normalizeDates(input.work_dates),
       cost_items: cleanCostItems(input.cost_items),
-      day_hours: cleanDayHours(input.day_hours, input.work_dates),
+      day_hours: cleanPerDay(input.day_hours, input.work_dates),
+      hourly_rate: input.hourly_rate,
+      day_km: cleanPerDay(input.day_km, input.work_dates),
+      fuel_consumption: input.fuel_consumption,
+      fuel_price: input.fuel_price,
       revenue: input.revenue,
       note: input.note,
     })
