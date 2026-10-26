@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, ProjectWithClient } from "@/lib/types/database.types";
+import { eachDateInRange } from "@/lib/utils/date";
 
 type TypedSupabaseClient = SupabaseClient<Database>;
 
@@ -19,6 +20,25 @@ export async function getProjects(
 
   const projects = (data ?? []) as unknown as ProjectWithClient[];
   return projects.sort((a, b) => b.work_dates[0].localeCompare(a.work_dates[0]));
+}
+
+/**
+ * Projekti, katerih vsaj en dan pade v dani razpon (za prikaz na koledarju).
+ * `work_dates` je array, zato uporabimo prekrivanje (`ov`) z vsemi dnevi razpona.
+ */
+export async function getProjectsInRange(
+  supabase: TypedSupabaseClient,
+  from: string,
+  to: string
+): Promise<ProjectWithClient[]> {
+  const { data, error } = await supabase
+    .from("projects")
+    .select("*, clients(id, company_name, color)")
+    .overlaps("work_dates", eachDateInRange(from, to))
+    .order("created_at", { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []) as unknown as ProjectWithClient[];
 }
 
 export async function getProjectById(

@@ -5,12 +5,14 @@ import type {
   CalendarEvent,
   Client,
   Leave,
+  ProjectWithClient,
   WorkEntryWithClient,
 } from "@/lib/types/database.types";
 import { createClient } from "@/lib/supabase/client";
 import { getWorkEntriesInRange } from "@/lib/data/workEntries";
 import { getEventsInRange } from "@/lib/data/events";
 import { getLeavesInRange } from "@/lib/data/leaves";
+import { getProjectsInRange } from "@/lib/data/projects";
 import {
   getMonthGrid,
   getMonthRange,
@@ -69,6 +71,7 @@ export default function MonthCalendar({ clients }: { clients: Client[] }) {
   const [entries, setEntries] = useState<WorkEntryWithClient[]>([]);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [leaves, setLeaves] = useState<Leave[]>([]);
+  const [projects, setProjects] = useState<ProjectWithClient[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterClientId, setFilterClientId] = useState<string | null>(null);
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
@@ -90,14 +93,16 @@ export default function MonthCalendar({ clients }: { clients: Client[] }) {
     const supabase = createClient();
     const { from, to } = getMonthRange(year, month);
     try {
-      const [entryData, eventData, leaveData] = await Promise.all([
+      const [entryData, eventData, leaveData, projectData] = await Promise.all([
         getWorkEntriesInRange(supabase, from, to),
         getEventsInRange(supabase, from, to),
         getLeavesInRange(supabase, from, to),
+        getProjectsInRange(supabase, from, to),
       ]);
       setEntries(entryData);
       setEvents(eventData);
       setLeaves(leaveData);
+      setProjects(projectData);
     } finally {
       setLoading(false);
     }
@@ -136,6 +141,32 @@ export default function MonthCalendar({ clients }: { clients: Client[] }) {
     return map;
   }, [entriesByDayAll, filterClientId]);
 
+  // Projekti po dnevu (vsak dan iz `work_dates`) - projekt je edini vir,
+  // na koledarju se prikaže kot stranka tega dne brez ločenega vnosa.
+  const projectsByDayAll = useMemo(() => {
+    const map = new Map<string, ProjectWithClient[]>();
+    for (const project of projects) {
+      for (const dateKey of project.work_dates) {
+        const list = map.get(dateKey) ?? [];
+        list.push(project);
+        map.set(dateKey, list);
+      }
+    }
+    return map;
+  }, [projects]);
+
+  const projectsByDay = useMemo(() => {
+    if (!filterClientId) return projectsByDayAll;
+    const map = new Map<string, ProjectWithClient[]>();
+    for (const [dateKey, dayProjects] of projectsByDayAll) {
+      const filtered = dayProjects.filter(
+        (p) => p.client_id === filterClientId
+      );
+      if (filtered.length > 0) map.set(dateKey, filtered);
+    }
+    return map;
+  }, [projectsByDayAll, filterClientId]);
+
   // Dogodki po dnevu - neodvisno od filtra strank (dogodki nimajo stranke).
   const eventsByDay = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>();
@@ -158,14 +189,18 @@ export default function MonthCalendar({ clients }: { clients: Client[] }) {
     : SLOVENIAN_WEEKDAYS_SHORT.slice(0, 5);
 
   function clientSummaryForDay(dateKey: string): DayClientSummary[] {
-    const dayEntries = entriesByDay.get(dateKey) ?? [];
+    // Ročni vnosi in projekti skupaj; ista stranka se prikaže le enkrat.
+    const sources = [
+      ...(entriesByDay.get(dateKey) ?? []),
+      ...(projectsByDay.get(dateKey) ?? []),
+    ];
     const seen = new Map<string, DayClientSummary>();
-    for (const entry of dayEntries) {
-      if (!entry.clients || seen.has(entry.client_id)) continue;
-      seen.set(entry.client_id, {
-        clientId: entry.client_id,
-        companyName: entry.clients.company_name,
-        color: entry.clients.color,
+    for (const item of sources) {
+      if (!item.clients || seen.has(item.client_id)) continue;
+      seen.set(item.client_id, {
+        clientId: item.client_id,
+        companyName: item.clients.company_name,
+        color: item.clients.color,
       });
     }
     return Array.from(seen.values());
@@ -260,6 +295,7 @@ export default function MonthCalendar({ clients }: { clients: Client[] }) {
           dateKey={selectedDay.dateKey}
           entries={entriesByDayAll.get(selectedDay.dateKey) ?? []}
           events={eventsByDay.get(selectedDay.dateKey) ?? []}
+          projects={projectsByDayAll.get(selectedDay.dateKey) ?? []}
           leaves={leavesForDay(selectedDay.dateKey)}
           clients={clients}
           onClose={() => setSelectedDateKey(null)}

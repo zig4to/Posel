@@ -1,12 +1,15 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import type {
   CalendarEvent,
   Client,
   Leave,
+  ProjectWithClient,
   WorkEntryWithClient,
 } from "@/lib/types/database.types";
+import { formatHours } from "@/lib/utils/projectCosts";
 import Modal from "@/components/ui/Modal";
 import Button from "@/components/ui/Button";
 import { ColorDot } from "@/components/ui/Badge";
@@ -28,6 +31,8 @@ type DayDetailPanelProps = {
   dateKey: string;
   entries: WorkEntryWithClient[];
   events: CalendarEvent[];
+  /** Projekti, ki vključujejo ta dan (urejajo se na strani projekta). */
+  projects: ProjectWithClient[];
   leaves: Leave[];
   clients: Client[];
   onClose: () => void;
@@ -54,6 +59,7 @@ export default function DayDetailPanel({
   dateKey,
   entries,
   events,
+  projects,
   leaves,
   clients,
   onClose,
@@ -207,6 +213,48 @@ export default function DayDetailPanel({
               </ul>
             )}
           </section>
+
+          {projects.length > 0 && (
+            <section className="space-y-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                Projekti
+              </h3>
+              <ul className="space-y-2">
+                {projects.map((project) => {
+                  const hours = project.day_hours?.[dateKey];
+                  return (
+                    <li
+                      key={project.id}
+                      className="flex items-start justify-between gap-2 rounded-md border border-gray-200 px-3 py-2 dark:border-gray-800"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 text-sm font-medium text-gray-900 dark:text-gray-100">
+                          <ColorDot color={project.clients?.color ?? "#999"} />
+                          <span className="min-w-0 truncate">
+                            {project.clients?.company_name ?? "Neznan partner"}
+                          </span>
+                        </div>
+                        <p className="break-words text-xs text-gray-500 dark:text-gray-400">
+                          Projekt: {project.name}
+                          {hours ? ` · ${formatHours(hours)}` : ""}
+                        </p>
+                      </div>
+                      {/* Projekt se ureja na svoji strani - dnevi na koledarju
+                          so izpeljani iz projekta, ne ločeni vnosi. */}
+                      <Link
+                        href={`/projekti/${project.id}/uredi`}
+                        aria-label="Uredi projekt"
+                        title="Uredi projekt"
+                        className={EDIT_BUTTON_CLASS}
+                      >
+                        <EditIcon className="h-4 w-4" />
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
 
           {leaves.length > 0 && (
             <section className="space-y-2">
