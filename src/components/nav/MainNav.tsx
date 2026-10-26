@@ -1,10 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import clsx from "@/lib/utils/clsx";
 import { logoutAction } from "@/actions/auth";
+import HeartBurst from "./HeartBurst";
+
+const SECRET_WORD = "tina";
+const SECRET_TAPS = 5;
+const SECRET_TAP_WINDOW_MS = 2000;
 
 const LINKS = [
   { href: "/", label: "Koledar" },
@@ -34,6 +39,42 @@ export default function MainNav({ userEmail }: { userEmail: string | null }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const [burst, setBurst] = useState(false);
+  const tapTimesRef = useRef<number[]>([]);
+  const closeBurst = useCallback(() => setBurst(false), []);
+
+  // Skrito: natipkana beseda (izven polj za vnos) ali 5 hitrih dotikov
+  // praznega dela glave.
+  useEffect(() => {
+    let typed = "";
+    const onKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest("input, textarea, select, [contenteditable]")) return;
+      if (e.key.length !== 1) return;
+      typed = (typed + e.key.toLowerCase()).slice(-SECRET_WORD.length);
+      if (typed === SECRET_WORD) {
+        typed = "";
+        setBurst(true);
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  function onHeaderClick(e: React.MouseEvent<HTMLElement>) {
+    const target = e.target as HTMLElement;
+    if (target.closest("a, button, form")) return;
+    const now = Date.now();
+    const taps = [...tapTimesRef.current, now].filter(
+      (t) => now - t < SECRET_TAP_WINDOW_MS
+    );
+    if (taps.length >= SECRET_TAPS) {
+      tapTimesRef.current = [];
+      setBurst(true);
+    } else {
+      tapTimesRef.current = taps;
+    }
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -47,7 +88,11 @@ export default function MainNav({ userEmail }: { userEmail: string | null }) {
   }, [open]);
 
   return (
-    <header className="border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+    <header
+      onClick={onHeaderClick}
+      className="border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"
+    >
+      {burst && <HeartBurst onDone={closeBurst} />}
       <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-x-2 gap-y-1 px-4 py-3">
         <nav className="flex min-w-0 flex-wrap items-center gap-1">
           {LINKS.map((link) => {
