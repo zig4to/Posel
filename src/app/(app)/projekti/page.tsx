@@ -7,7 +7,7 @@ import Button from "@/components/ui/Button";
 import ProjectCard from "@/components/projects/ProjectCard";
 import TaxObligationsButton from "@/components/projects/TaxObligationsButton";
 import { formatEUR } from "@/lib/utils/currency";
-import { SLOVENIAN_MONTHS } from "@/lib/utils/date";
+import { formatDateKey, SLOVENIAN_MONTHS } from "@/lib/utils/date";
 import { projectTotalCosts } from "@/lib/utils/projectCosts";
 import type { ProjectWithClient } from "@/lib/types/database.types";
 
@@ -44,6 +44,9 @@ export default async function ProjektiPage() {
   for (const tax of monthlyTaxes) {
     taxByMonth.set(`${tax.year}-${pad2(tax.month)}`, tax.amount);
   }
+
+  // Tekoči mesec ima seznam projektov privzeto razprt.
+  const currentMonthKey = formatDateKey(new Date()).slice(0, 7);
 
   const sortedKeys = [...new Set([...groups.keys(), ...taxByMonth.keys()])].sort(
     (a, b) => b.localeCompare(a)
@@ -133,7 +136,7 @@ export default async function ProjektiPage() {
                     Ni projektov ta mesec.
                   </p>
                 ) : (
-                  <details className="group">
+                  <details className="group" open={key === currentMonthKey}>
                     <summary className="mb-2 flex cursor-pointer list-none items-center gap-1.5 text-sm font-semibold text-gray-900 select-none dark:text-gray-100 [&::-webkit-details-marker]:hidden">
                       <svg
                         viewBox="0 0 24 24"

@@ -115,6 +115,7 @@ export type Database = {
           name: string;
           work_dates: string[];
           cost_items: CostItem[];
+          extra_items: CostItem[];
           day_hours: DayHours;
           hourly_rate: number | null;
           day_km: DayKm;
@@ -132,6 +133,7 @@ export type Database = {
           name: string;
           work_dates: string[];
           cost_items?: CostItem[];
+          extra_items?: CostItem[];
           day_hours?: DayHours;
           hourly_rate?: number | null;
           day_km?: DayKm;
@@ -149,6 +151,7 @@ export type Database = {
           name?: string;
           work_dates?: string[];
           cost_items?: CostItem[];
+          extra_items?: CostItem[];
           day_hours?: DayHours;
           hourly_rate?: number | null;
           day_km?: DayKm;

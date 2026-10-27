@@ -22,19 +22,22 @@ function ChevronDownIcon({ className }: { className?: string }) {
 
 /**
  * Zložljiv razdelek: glava z naslovom in povzetkom (npr. znesek) na desni,
- * klik odpre/zapre vsebino. `nested` = manjša različica za podrazdelke.
+ * klik odpre/zapre vsebino. `nested` = manjša različica za podrazdelke,
+ * `compact` = nižja glava.
  */
 export default function Collapsible({
   title,
   summary,
   defaultOpen = false,
   nested = false,
+  compact = false,
   children,
 }: {
   title: string;
   summary?: React.ReactNode;
   defaultOpen?: boolean;
   nested?: boolean;
+  compact?: boolean;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -56,7 +59,7 @@ export default function Collapsible({
         onClick={() => setOpen((v) => !v)}
         className={clsx(
           "flex w-full items-center gap-2 text-left",
-          nested ? "px-3 py-2" : "px-3 py-2.5"
+          compact ? "px-3 py-1.5" : nested ? "px-3 py-2" : "px-3 py-2.5"
         )}
       >
         <ChevronDownIcon

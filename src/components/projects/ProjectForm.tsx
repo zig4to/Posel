@@ -18,6 +18,7 @@ import Button from "@/components/ui/Button";
 import Collapsible from "@/components/ui/Collapsible";
 import MonthYearPicker from "@/components/calendar/MonthYearPicker";
 import MonthDayPicker from "@/components/projects/MonthDayPicker";
+import ItemRows, { EMPTY_ITEM, type ItemFields } from "@/components/projects/ItemRows";
 import { formatEUR } from "@/lib/utils/currency";
 import { createClient } from "@/lib/supabase/client";
 import { getWorkEntriesInRange } from "@/lib/data/workEntries";
@@ -29,6 +30,7 @@ import {
   formatKm,
   fuelCost,
   fuelLiters,
+  sumCostItems,
   type FuelRoute,
 } from "@/lib/utils/projectCosts";
 
@@ -41,8 +43,6 @@ type ProjectFormProps = {
   /** Trenutna cena dizla (EUR/l) z goriva.si; null, če je ni bilo mogoče pridobiti. */
   dieselPrice: number | null;
 };
-
-type CostItemFields = { amount: string; note: string };
 
 type Billing = "hourly" | "fixed";
 
@@ -65,14 +65,39 @@ const NO_DAYS_HINT = (
   </p>
 );
 
-function initialCostItems(project?: ProjectWithClient): CostItemFields[] {
-  if (project && (project.cost_items ?? []).length > 0) {
-    return project.cost_items.map((item) => ({
+function initialItems(items: CostItem[] | undefined): ItemFields[] {
+  if (items && items.length > 0) {
+    return items.map((item) => ({
       amount: String(item.amount),
       note: item.note ?? "",
     }));
   }
-  return [{ amount: "", note: "" }];
+  return [EMPTY_ITEM];
+}
+
+function toCostItems(items: ItemFields[]): CostItem[] {
+  return items.map((item) => ({
+    amount: Number(item.amount) || 0,
+    note: item.note.trim() || null,
+  }));
+}
+
+/** Na računalniku (md+) se višina opombe prilagodi vsebini. */
+function fitNoteHeight(el: HTMLTextAreaElement | null) {
+  if (!el || !window.matchMedia("(min-width: 768px)").matches) return;
+  el.style.height = "auto";
+  el.style.height = `${el.scrollHeight + 2}px`; // + zgornji in spodnji rob
+}
+
+/** Kratek predogled opombe za glavo zložljivega razdelka. */
+function notePreview(note: string): string | undefined {
+  const firstLine = note.trim().split("\n")[0];
+  if (!firstLine) return undefined;
+  return firstLine.length > 30 ? `${firstLine.slice(0, 30)}…` : firstLine;
+}
+
+function sumItemFields(items: ItemFields[]): number {
+  return items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
 }
 
 function toFieldValues(values: Record<string, number> | undefined): Record<string, string> {
@@ -109,8 +134,11 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
   const [selectedDates, setSelectedDates] = useState<Set<string>>(
     () => new Set(project?.work_dates ?? [])
   );
-  const [costItems, setCostItems] = useState<CostItemFields[]>(() =>
-    initialCostItems(project)
+  const [costItems, setCostItems] = useState<ItemFields[]>(() =>
+    initialItems(project?.cost_items)
+  );
+  const [extraItems, setExtraItems] = useState<ItemFields[]>(() =>
+    initialItems(project?.extra_items)
   );
   const [dayHours, setDayHours] = useState<Record<string, string>>(() =>
     toFieldValues(project?.day_hours)
@@ -140,7 +168,12 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
   const [hourlyRate, setHourlyRate] = useState(
     project?.hourly_rate != null ? String(project.hourly_rate) : ""
   );
-  const [revenue, setRevenue] = useState(project ? String(project.revenue) : "");
+  // Ročni priliv (na projekt) brez dodatnih storitev - te so v revenue že vštete.
+  const [revenue, setRevenue] = useState(() =>
+    project
+      ? String(Math.round((project.revenue - sumCostItems(project.extra_items)) * 100) / 100)
+      : ""
+  );
   const [note, setNote] = useState(project?.note ?? "");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -195,10 +228,8 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
   const fuelPriceNum = Number(fuelPrice) || 0;
   const totalFuelCost = fuelCost(totalKm, consumptionNum, fuelPriceNum);
 
-  const otherCosts = useMemo(
-    () => costItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0),
-    [costItems]
-  );
+  const otherCosts = useMemo(() => sumItemFields(costItems), [costItems]);
+  const extrasTotal = useMemo(() => sumItemFields(extraItems), [extraItems]);
   const totalCosts = otherCosts + totalFuelCost;
 
   // Seštevek ur samo za trenutno izbrane dni.
@@ -207,10 +238,12 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
     [sortedSelectedDates, dayHours]
   );
 
-  // Na uro: priliv = vrednost projekta (ure × cena na uro); na projekt: ročen.
+  // Na uro: osnova = vrednost projekta (ure × cena na uro); na projekt: ročna.
+  // Priliv = osnova + dodatne storitve.
   const rateNum = Number(hourlyRate) || 0;
   const projectValue = Math.round(totalHours * rateNum * 100) / 100;
-  const effectiveRevenue = billing === "hourly" ? projectValue : Number(revenue) || 0;
+  const baseRevenue = billing === "hourly" ? projectValue : Number(revenue) || 0;
+  const effectiveRevenue = Math.round((baseRevenue + extrasTotal) * 100) / 100;
 
   const profit = effectiveRevenue - totalCosts;
 
@@ -239,26 +272,6 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
       ...prev,
       [dateKey]: prev[dateKey] === String(km) ? "" : String(km),
     }));
-  }
-
-  function updateCostAmount(index: number, value: string) {
-    setCostItems((prev) =>
-      prev.map((item, i) => (i === index ? { ...item, amount: value } : item))
-    );
-  }
-
-  function updateCostNote(index: number, value: string) {
-    setCostItems((prev) =>
-      prev.map((item, i) => (i === index ? { ...item, note: value } : item))
-    );
-  }
-
-  function addCostItem() {
-    setCostItems((prev) => [...prev, { amount: "", note: "" }]);
-  }
-
-  function removeCostItem(index: number) {
-    setCostItems((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== index) : prev));
   }
 
   function handleYearMonthChange(nextYear: number, nextMonth: number) {
@@ -326,11 +339,6 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
     e.preventDefault();
     setError(null);
 
-    const cost_items: CostItem[] = costItems.map((item) => ({
-      amount: Number(item.amount) || 0,
-      note: item.note.trim() || null,
-    }));
-
     // Na projekt: ur in urne postavke ne shranjujemo.
     const day_hours: Record<string, number> = {};
     if (billing === "hourly") {
@@ -359,7 +367,8 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
       name: name.trim(),
       client_id: clientId,
       work_dates: [...selectedDates],
-      cost_items,
+      cost_items: toCostItems(costItems),
+      extra_items: toCostItems(extraItems),
       day_hours,
       hourly_rate: billing === "hourly" ? rateNum : null,
       day_km,
@@ -432,103 +441,101 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
       </div>
 
       {/* Obračun: na uro (ure × cena na uro) ali na projekt (ročen priliv). */}
-      <div>
-        <span className={SECTION_LABEL_CLASS}>Obračun</span>
-        <div className="space-y-3 rounded-md border border-gray-200 p-3 dark:border-gray-800">
-          <div
-            role="radiogroup"
-            aria-label="Način obračuna"
-            className="grid grid-cols-2 gap-1 rounded-md bg-gray-100 p-1 dark:bg-gray-800"
-          >
-            {BILLING_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                role="radio"
-                aria-checked={billing === option.value}
-                onClick={() => setBilling(option.value)}
-                className={
-                  "rounded px-3 py-1.5 text-sm font-medium transition-colors " +
-                  (billing === option.value
-                    ? "bg-white text-gray-900 shadow-sm dark:bg-gray-900 dark:text-gray-100"
-                    : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200")
-                }
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-
-          {billing === "hourly" ? (
-            <>
-              <div className="w-40">
-                <Field label="Cena na uro (EUR)" htmlFor="hourly_rate">
-                  <Input
-                    id="hourly_rate"
-                    type="number"
-                    inputMode="decimal"
-                    step="0.01"
-                    min="0"
-                    placeholder="npr. 25"
-                    value={hourlyRate}
-                    onChange={(e) => setHourlyRate(e.target.value)}
-                  />
-                </Field>
-              </div>
-
-              <div>
-                <span className={SECTION_LABEL_CLASS}>Ure po dnevih</span>
-                {sortedSelectedDates.length === 0 ? (
-                  NO_DAYS_HINT
-                ) : (
-                  <div className={DAY_GRID_CLASS}>
-                    {sortedSelectedDates.map((date) => (
-                      <div
-                        key={date}
-                        className="rounded-md border border-gray-200 p-2 dark:border-gray-800"
-                      >
-                        <label htmlFor={`hours-${date}`} className={DAY_CELL_LABEL_CLASS}>
-                          {formatDayLabel(date)}
-                        </label>
-                        <Input
-                          id={`hours-${date}`}
-                          type="number"
-                          inputMode="decimal"
-                          step="0.5"
-                          min="0"
-                          max="24"
-                          placeholder="0"
-                          value={dayHours[date] ?? ""}
-                          onChange={(e) => updateDayHours(date, e.target.value)}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                {formatHours(totalHours)} × {formatEUR(rateNum)}/h ={" "}
-                <span className="font-semibold text-gray-900 dark:text-gray-100">
-                  {formatEUR(projectValue)}
-                </span>
-              </p>
-            </>
-          ) : (
-            <Field label="Priliv (EUR)" htmlFor="revenue">
-              <Input
-                id="revenue"
-                type="number"
-                inputMode="decimal"
-                step="0.01"
-                min="0"
-                value={revenue}
-                onChange={(e) => setRevenue(e.target.value)}
-              />
-            </Field>
-          )}
+      <Collapsible title="Obračun" summary={formatEUR(baseRevenue)} defaultOpen>
+        <div
+          role="radiogroup"
+          aria-label="Način obračuna"
+          className="grid grid-cols-2 gap-1 rounded-md bg-gray-100 p-1 dark:bg-gray-800"
+        >
+          {BILLING_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              role="radio"
+              aria-checked={billing === option.value}
+              onClick={() => setBilling(option.value)}
+              className={
+                "rounded px-3 py-1.5 text-sm font-medium transition-colors " +
+                (billing === option.value
+                  ? "bg-white text-gray-900 shadow-sm dark:bg-gray-900 dark:text-gray-100"
+                  : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200")
+              }
+            >
+              {option.label}
+            </button>
+          ))}
         </div>
-      </div>
+
+        {billing === "hourly" ? (
+          <>
+            <div className="w-40">
+              <Field label="Cena na uro (EUR)" htmlFor="hourly_rate">
+                <Input
+                  id="hourly_rate"
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min="0"
+                  placeholder="npr. 25"
+                  value={hourlyRate}
+                  onChange={(e) => setHourlyRate(e.target.value)}
+                />
+              </Field>
+            </div>
+
+            <div>
+              <span className={SECTION_LABEL_CLASS}>Ure po dnevih</span>
+              {sortedSelectedDates.length === 0 ? (
+                NO_DAYS_HINT
+              ) : (
+                <div className={DAY_GRID_CLASS}>
+                  {sortedSelectedDates.map((date) => (
+                    <div
+                      key={date}
+                      className="rounded-md border border-gray-200 p-2 dark:border-gray-800"
+                    >
+                      <label htmlFor={`hours-${date}`} className={DAY_CELL_LABEL_CLASS}>
+                        {formatDayLabel(date)}
+                      </label>
+                      <Input
+                        id={`hours-${date}`}
+                        type="number"
+                        inputMode="decimal"
+                        step="0.5"
+                        min="0"
+                        max="24"
+                        placeholder="0"
+                        value={dayHours[date] ?? ""}
+                        onChange={(e) => updateDayHours(date, e.target.value)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              {formatHours(totalHours)} × {formatEUR(rateNum)}/h ={" "}
+              <span className="font-semibold text-gray-900 dark:text-gray-100">
+                {formatEUR(projectValue)}
+              </span>
+              {extrasTotal > 0 && ` (+ ${formatEUR(extrasTotal)} dodatne storitve)`}
+            </p>
+          </>
+        ) : (
+          <Field label="Priliv (EUR)" htmlFor="revenue">
+            <Input
+              id="revenue"
+              type="number"
+              inputMode="decimal"
+              step="0.01"
+              min="0"
+              value={revenue}
+              onChange={(e) => setRevenue(e.target.value)}
+            />
+          </Field>
+        )}
+      </Collapsible>
 
       <Collapsible
         title="Stroški"
@@ -702,54 +709,29 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
           summary={formatEUR(otherCosts)}
           defaultOpen={otherCosts > 0}
         >
-          {costItems.map((item, index) => (
-            <div key={index} className="flex items-center gap-2">
-              <div className="w-24 flex-shrink-0">
-                <Input
-                  id={`cost-amount-${index}`}
-                  type="number"
-                  inputMode="decimal"
-                  step="0.01"
-                  min="0"
-                  placeholder="Znesek"
-                  aria-label="Znesek stroška"
-                  value={item.amount}
-                  onChange={(e) => updateCostAmount(index, e.target.value)}
-                />
-              </div>
-              <div className="min-w-0 flex-1">
-                <Input
-                  id={`cost-note-${index}`}
-                  placeholder="Opomba"
-                  aria-label="Opomba stroška"
-                  value={item.note}
-                  onChange={(e) => updateCostNote(index, e.target.value)}
-                />
-              </div>
-              {index === costItems.length - 1 ? (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="h-9 w-9 flex-shrink-0 px-0"
-                  onClick={addCostItem}
-                  aria-label="Dodaj strošek"
-                >
-                  +
-                </Button>
-              ) : (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="h-9 w-9 flex-shrink-0 px-0"
-                  onClick={() => removeCostItem(index)}
-                  aria-label="Odstrani strošek"
-                >
-                  ×
-                </Button>
-              )}
-            </div>
-          ))}
+          <ItemRows
+            items={costItems}
+            onChange={setCostItems}
+            idPrefix="cost"
+            itemLabel="stroška"
+          />
         </Collapsible>
+      </Collapsible>
+
+      {/* Dodatne storitve: zaračunane poleg osnovnega obračuna, prištejejo se prilivu. */}
+      <Collapsible
+        compact
+        title="Dodatne storitve"
+        summary={formatEUR(extrasTotal)}
+        defaultOpen={extrasTotal > 0}
+      >
+        <ItemRows
+          items={extraItems}
+          onChange={setExtraItems}
+          idPrefix="extra"
+          itemLabel="storitve"
+          notePlaceholder="Opis storitve"
+        />
       </Collapsible>
 
       {/* Povzetek projekta - enaka razdelitev kot na kartici projekta. */}
@@ -779,14 +761,20 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
         </div>
       </div>
 
-      <Field label="Opomba" htmlFor="note">
+      <Collapsible title="Opomba" summary={notePreview(note)} defaultOpen={Boolean(note)}>
         <Textarea
           id="note"
+          aria-label="Opomba"
           rows={2}
+          ref={fitNoteHeight}
+          className="md:resize-none md:overflow-hidden"
           value={note}
-          onChange={(e) => setNote(e.target.value)}
+          onChange={(e) => {
+            setNote(e.target.value);
+            fitNoteHeight(e.currentTarget);
+          }}
         />
-      </Field>
+      </Collapsible>
 
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 

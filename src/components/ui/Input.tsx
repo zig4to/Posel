@@ -1,4 +1,4 @@
-import { InputHTMLAttributes, LabelHTMLAttributes, TextareaHTMLAttributes } from "react";
+import { ComponentProps, InputHTMLAttributes, LabelHTMLAttributes } from "react";
 import clsx from "@/lib/utils/clsx";
 
 const FIELD_CLASSES =
@@ -20,7 +20,8 @@ export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={clsx(FIELD_CLASSES, props.className)} />;
 }
 
-export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+// ComponentProps vključuje tudi ref (React 19), npr. za prilagajanje višine.
+export function Textarea(props: ComponentProps<"textarea">) {
   return <textarea {...props} className={clsx(FIELD_CLASSES, props.className)} />;
 }
 

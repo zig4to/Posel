@@ -10,6 +10,8 @@ export type ProjectInput = {
   client_id: string;
   work_dates: string[];
   cost_items: CostItem[];
+  /** Dodatne storitve - že vštete v revenue. */
+  extra_items: CostItem[];
   day_hours: DayHours;
   hourly_rate: number | null;
   day_km: DayKm;
@@ -47,6 +49,9 @@ function validate(input: ProjectInput): string | null {
   if (input.work_dates.length === 0) return "Izberi vsaj en dan.";
   if (input.cost_items.some((item) => item.amount < 0)) {
     return "Stroški ne smejo biti negativni.";
+  }
+  if (input.extra_items.some((item) => !(item.amount >= 0))) {
+    return "Znesek dodatne storitve ne sme biti negativen.";
   }
   if (input.revenue < 0) return "Priliv ne sme biti negativen.";
   if (input.hourly_rate !== null && !(input.hourly_rate >= 0)) {
@@ -86,6 +91,7 @@ export async function createProjectAction(
     client_id: input.client_id,
     work_dates: normalizeDates(input.work_dates),
     cost_items: cleanCostItems(input.cost_items),
+    extra_items: cleanCostItems(input.extra_items),
     day_hours: cleanPerDay(input.day_hours, input.work_dates),
     hourly_rate: input.hourly_rate,
     day_km: cleanPerDay(input.day_km, input.work_dates),
@@ -118,6 +124,7 @@ export async function updateProjectAction(
       client_id: input.client_id,
       work_dates: normalizeDates(input.work_dates),
       cost_items: cleanCostItems(input.cost_items),
+      extra_items: cleanCostItems(input.extra_items),
       day_hours: cleanPerDay(input.day_hours, input.work_dates),
       hourly_rate: input.hourly_rate,
       day_km: cleanPerDay(input.day_km, input.work_dates),

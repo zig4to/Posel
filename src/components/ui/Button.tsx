@@ -1,7 +1,7 @@
 import { ButtonHTMLAttributes } from "react";
 import clsx from "@/lib/utils/clsx";
 
-type Variant = "primary" | "secondary" | "danger" | "ghost" | "warning";
+type Variant = "primary" | "secondary" | "danger" | "dangerSoft" | "ghost" | "warning";
 
 const VARIANT_CLASSES: Record<Variant, string> = {
   primary:
@@ -10,6 +10,9 @@ const VARIANT_CLASSES: Record<Variant, string> = {
     "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 disabled:text-gray-400 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700 dark:hover:bg-gray-700 dark:disabled:text-gray-500",
   danger:
     "bg-red-600 text-white hover:bg-red-700 disabled:bg-red-300 dark:disabled:bg-red-900 dark:disabled:text-red-300",
+  // Manj izrazit rdeč gumb (npr. Izbriši na karticah).
+  dangerSoft:
+    "bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 disabled:text-red-300 dark:bg-red-950/40 dark:text-red-300 dark:border-red-900/60 dark:hover:bg-red-950/70 dark:disabled:text-red-800",
   ghost:
     "bg-transparent text-gray-600 hover:bg-gray-100 disabled:text-gray-300 dark:text-gray-400 dark:hover:bg-gray-800 dark:disabled:text-gray-600",
   warning:
