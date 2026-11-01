@@ -13,6 +13,6 @@ export const config = {
      * - favicon.ico, manifest.webmanifest (metadata datoteke)
      * - datotek s končnico (slike, ikone, ipd.)
      */
-    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|webmanifest)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|webmanifest|js)$).*)",
   ],
 };
