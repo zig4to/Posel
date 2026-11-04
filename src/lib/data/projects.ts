@@ -54,3 +54,25 @@ export async function getProjectById(
   if (error) throw error;
   return data as unknown as ProjectWithClient;
 }
+
+export type ProjectSummary = {
+  id: string;
+  name: string;
+  client_id: string;
+  work_dates: string[];
+};
+
+/** Kratek seznam projektov (za izbiro projekta pri dodajanju dneva v koledarju). */
+export async function getProjectSummaries(
+  supabase: TypedSupabaseClient
+): Promise<ProjectSummary[]> {
+  const { data, error } = await supabase
+    .from("projects")
+    .select("id, name, client_id, work_dates");
+
+  if (error) throw error;
+  // Najnovejši (po zadnjem dnevu) najprej.
+  return (data ?? []).sort((a, b) =>
+    b.work_dates[b.work_dates.length - 1].localeCompare(a.work_dates[a.work_dates.length - 1])
+  );
+}

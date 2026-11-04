@@ -7,17 +7,17 @@ import type {
   Client,
   Leave,
   ProjectWithClient,
-  WorkEntryWithClient,
 } from "@/lib/types/database.types";
 import { formatHours } from "@/lib/utils/projectCosts";
 import Modal from "@/components/ui/Modal";
 import Button from "@/components/ui/Button";
 import { ColorDot } from "@/components/ui/Badge";
 import { formatFullDate, formatShortDate, formatTime } from "@/lib/utils/date";
-import { deleteWorkEntryAction } from "@/actions/workEntries";
 import { deleteEventAction } from "@/actions/events";
 import { deleteLeaveAction } from "@/actions/leaves";
-import TimeEntryForm from "./TimeEntryForm";
+import { moveProjectDayAction, removeProjectDayAction } from "@/actions/projects";
+import { Input } from "@/components/ui/Input";
+import ProjectDayForm from "./ProjectDayForm";
 import EventForm from "./EventForm";
 import LeaveForm from "./LeaveForm";
 import EventIcon from "./EventIcon";
@@ -29,9 +29,8 @@ const EDIT_BUTTON_CLASS =
 type DayDetailPanelProps = {
   date: Date;
   dateKey: string;
-  entries: WorkEntryWithClient[];
   events: CalendarEvent[];
-  /** Projekti, ki vključujejo ta dan (urejajo se na strani projekta). */
+  /** Projekti, ki vključujejo ta dan - edini vir dela strank na koledarju. */
   projects: ProjectWithClient[];
   leaves: Leave[];
   clients: Client[];
@@ -43,11 +42,31 @@ type Mode =
   | "list"
   | "choose"
   | "add"
-  | "edit"
   | "add-event"
   | "edit-event"
   | "add-leave"
   | "edit-leave";
+
+// Lucide "arrow-right-left" - prestavi dan.
+function MoveIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="m16 3 4 4-4 4" />
+      <path d="M20 7H4" />
+      <path d="m8 21-4-4 4-4" />
+      <path d="M4 17h16" />
+    </svg>
+  );
+}
 
 function formatTimeRange(start: string | null, end: string | null): string {
   if (!start && !end) return "Brez določenih ur";
@@ -57,7 +76,6 @@ function formatTimeRange(start: string | null, end: string | null): string {
 export default function DayDetailPanel({
   date,
   dateKey,
-  entries,
   events,
   projects,
   leaves,
@@ -66,17 +84,48 @@ export default function DayDetailPanel({
   onChanged,
 }: DayDetailPanelProps) {
   const [mode, setMode] = useState<Mode>("list");
-  const [editingEntry, setEditingEntry] = useState<WorkEntryWithClient | null>(
-    null
-  );
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [editingLeave, setEditingLeave] = useState<Leave | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  // Prestavitev dneva projekta (vrstica, ki je trenutno odprta za prestavitev).
+  const [movingProjectId, setMovingProjectId] = useState<string | null>(null);
+  const [moveTarget, setMoveTarget] = useState(dateKey);
+  const [moveError, setMoveError] = useState<string | null>(null);
+
+  function handleMoveProjectDay(projectId: string) {
+    setMoveError(null);
+    if (!moveTarget) {
+      setMoveError("Izberi datum.");
+      return;
+    }
+    startTransition(async () => {
+      const result = await moveProjectDayAction(projectId, dateKey, moveTarget);
+      if (result.error) {
+        setMoveError(result.error);
+        return;
+      }
+      setMovingProjectId(null);
+      onChanged();
+    });
+  }
+
+  function handleRemoveProjectDay(project: ProjectWithClient) {
+    if (!confirm(`Odstraniti ta dan iz projekta "${project.name}"?`)) return;
+    setMoveError(null);
+    startTransition(async () => {
+      const result = await removeProjectDayAction(project.id, dateKey);
+      if (result.error) {
+        setMoveError(result.error);
+        return;
+      }
+      setMovingProjectId(null);
+      onChanged();
+    });
+  }
 
   function handleSaved() {
     setMode("list");
-    setEditingEntry(null);
     setEditingEvent(null);
     setEditingLeave(null);
     onChanged();
@@ -84,20 +133,8 @@ export default function DayDetailPanel({
 
   function backToList() {
     setMode("list");
-    setEditingEntry(null);
     setEditingEvent(null);
     setEditingLeave(null);
-  }
-
-  function handleDeleteEntry(entry: WorkEntryWithClient) {
-    if (!confirm("Izbriši ta vnos?")) return;
-    setDeletingId(entry.id);
-    startTransition(async () => {
-      await deleteWorkEntryAction(entry.id);
-      setDeletingId(null);
-      backToList();
-      onChanged();
-    });
   }
 
   function handleDeleteEvent(event: CalendarEvent) {
@@ -171,90 +208,129 @@ export default function DayDetailPanel({
 
           <section className="space-y-2">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
-              Stranke
+              Projekti
             </h3>
-            {entries.length === 0 ? (
+            {projects.length === 0 ? (
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                Ni vnosov za ta dan.
+                Ni projektov za ta dan.
               </p>
             ) : (
               <ul className="space-y-2">
-                {entries.map((entry) => (
-                  <li
-                    key={entry.id}
-                    className="flex items-start justify-between gap-2 rounded-md border border-gray-200 px-3 py-2 dark:border-gray-800"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 text-sm font-medium text-gray-900 dark:text-gray-100">
-                        <ColorDot color={entry.clients?.color ?? "#999"} />
-                        <span className="min-w-0 truncate">
-                          {entry.clients?.company_name ?? "Neznan partner"}
-                        </span>
-                      </div>
-                      <p className="break-words text-xs text-gray-500 dark:text-gray-400">
-                        {formatTimeRange(entry.start_time, entry.end_time)}
-                        {entry.note ? ` · ${entry.note}` : ""}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      aria-label="Uredi vnos"
-                      title="Uredi"
-                      className={EDIT_BUTTON_CLASS}
-                      onClick={() => {
-                        setEditingEntry(entry);
-                        setMode("edit");
-                      }}
-                    >
-                      <EditIcon className="h-4 w-4" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-
-          {projects.length > 0 && (
-            <section className="space-y-2">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
-                Projekti
-              </h3>
-              <ul className="space-y-2">
                 {projects.map((project) => {
                   const hours = project.day_hours?.[dateKey];
+                  const time = project.day_times?.[dateKey];
+                  const dayNote = project.day_notes?.[dateKey];
+                  const details = [
+                    time && (time.start || time.end)
+                      ? formatTimeRange(time.start, time.end)
+                      : null,
+                    hours ? formatHours(hours) : null,
+                    dayNote || null,
+                  ].filter(Boolean);
                   return (
                     <li
                       key={project.id}
-                      className="flex items-start justify-between gap-2 rounded-md border border-gray-200 px-3 py-2 dark:border-gray-800"
+                      className="rounded-md border border-gray-200 px-3 py-2 dark:border-gray-800"
                     >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5 text-sm font-medium text-gray-900 dark:text-gray-100">
-                          <ColorDot color={project.clients?.color ?? "#999"} />
-                          <span className="min-w-0 truncate">
-                            {project.clients?.company_name ?? "Neznan partner"}
-                          </span>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 text-sm font-medium text-gray-900 dark:text-gray-100">
+                            <ColorDot color={project.clients?.color ?? "#999"} />
+                            <span className="min-w-0 truncate">
+                              {project.clients?.company_name ?? "Neznan partner"}
+                            </span>
+                          </div>
+                          <p className="break-words text-xs text-gray-500 dark:text-gray-400">
+                            Projekt: {project.name}
+                          </p>
+                          {details.length > 0 && (
+                            <p className="break-words text-xs text-gray-500 dark:text-gray-400">
+                              {details.join(" · ")}
+                            </p>
+                          )}
                         </div>
-                        <p className="break-words text-xs text-gray-500 dark:text-gray-400">
-                          Projekt: {project.name}
-                          {hours ? ` · ${formatHours(hours)}` : ""}
-                        </p>
+                        <button
+                          type="button"
+                          aria-label="Prestavi ali odstrani dan projekta"
+                          title="Prestavi / odstrani dan"
+                          className={EDIT_BUTTON_CLASS}
+                          onClick={() => {
+                            setMovingProjectId(
+                              movingProjectId === project.id ? null : project.id
+                            );
+                            setMoveTarget(dateKey);
+                            setMoveError(null);
+                          }}
+                        >
+                          <MoveIcon className="h-4 w-4" />
+                        </button>
+                        {/* Projekt se ureja na svoji strani - dnevi na koledarju
+                            so izpeljani iz projekta, ne ločeni vnosi. */}
+                        <Link
+                          href={`/projekti/${project.id}/uredi`}
+                          aria-label="Uredi projekt"
+                          title="Uredi projekt"
+                          className={EDIT_BUTTON_CLASS}
+                        >
+                          <EditIcon className="h-4 w-4" />
+                        </Link>
                       </div>
-                      {/* Projekt se ureja na svoji strani - dnevi na koledarju
-                          so izpeljani iz projekta, ne ločeni vnosi. */}
-                      <Link
-                        href={`/projekti/${project.id}/uredi`}
-                        aria-label="Uredi projekt"
-                        title="Uredi projekt"
-                        className={EDIT_BUTTON_CLASS}
-                      >
-                        <EditIcon className="h-4 w-4" />
-                      </Link>
+                      {movingProjectId === project.id && (
+                        <div className="mt-2 space-y-2 border-t border-gray-100 pt-2 dark:border-gray-800">
+                          <label
+                            htmlFor={`move-${project.id}`}
+                            className="block text-xs font-medium text-gray-600 dark:text-gray-400"
+                          >
+                            Prestavi ta dan na
+                          </label>
+                          <Input
+                            id={`move-${project.id}`}
+                            type="date"
+                            value={moveTarget}
+                            onChange={(e) => setMoveTarget(e.target.value)}
+                          />
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            Prestavijo se tudi čas, ure, km in opomba tega dne.
+                          </p>
+                          {moveError && (
+                            <p className="text-xs text-red-600 dark:text-red-400">{moveError}</p>
+                          )}
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              className="h-8 text-xs"
+                              disabled={pending || moveTarget === dateKey}
+                              onClick={() => handleMoveProjectDay(project.id)}
+                            >
+                              {pending ? "Prestavljam …" : "Prestavi"}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              className="h-8 text-xs"
+                              disabled={pending}
+                              onClick={() => setMovingProjectId(null)}
+                            >
+                              Prekliči
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="danger"
+                              className="ml-auto h-8 text-xs"
+                              disabled={pending}
+                              onClick={() => handleRemoveProjectDay(project)}
+                            >
+                              Odstrani dan
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </li>
                   );
                 })}
               </ul>
-            </section>
-          )}
+            )}
+          </section>
 
           {leaves.length > 0 && (
             <section className="space-y-2">
@@ -330,7 +406,7 @@ export default function DayDetailPanel({
             onClick={() => setMode("add")}
             className="w-full"
           >
-            Vnos stranke
+            Dan projekta
           </Button>
           <Button
             type="button"
@@ -351,22 +427,11 @@ export default function DayDetailPanel({
       )}
 
       {mode === "add" && (
-        <TimeEntryForm
+        <ProjectDayForm
           dateKey={dateKey}
           clients={clients}
           onSaved={handleSaved}
           onCancel={() => setMode("list")}
-        />
-      )}
-
-      {mode === "edit" && editingEntry && (
-        <TimeEntryForm
-          dateKey={dateKey}
-          clients={clients}
-          entry={editingEntry}
-          onSaved={handleSaved}
-          onDelete={() => handleDeleteEntry(editingEntry)}
-          onCancel={backToList}
         />
       )}
 

@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import type {
   Client,
   CostItem,
+  DayNotes,
+  DayTimes,
   ProjectWithClient,
-  WorkEntryWithClient,
 } from "@/lib/types/database.types";
 import {
   createProjectAction,
@@ -21,8 +22,17 @@ import MonthDayPicker from "@/components/projects/MonthDayPicker";
 import ItemRows, { EMPTY_ITEM, type ItemFields } from "@/components/projects/ItemRows";
 import { formatEUR } from "@/lib/utils/currency";
 import { createClient } from "@/lib/supabase/client";
-import { getWorkEntriesInRange } from "@/lib/data/workEntries";
+import { getProjectsInRange } from "@/lib/data/projects";
+import { hoursBetween } from "@/lib/utils/projectDays";
 import { getMonthRange, SLOVENIAN_WEEKDAYS_SHORT } from "@/lib/utils/date";
+import clsx from "@/lib/utils/clsx";
+import {
+  addMonths,
+  autoBillingMonth,
+  formatMonthKey,
+  monthKeyOf,
+  workMonths,
+} from "@/lib/utils/projectMonths";
 import {
   DEFAULT_FUEL_CONSUMPTION,
   FUEL_ROUTES,
@@ -30,6 +40,7 @@ import {
   formatKm,
   fuelCost,
   fuelLiters,
+  SHARED_FUEL_FACTOR,
   sumCostItems,
   type FuelRoute,
 } from "@/lib/utils/projectCosts";
@@ -108,11 +119,29 @@ function toFieldValues(values: Record<string, number> | undefined): Record<strin
   return result;
 }
 
-/** "YYYY-MM-DD" -> "pon 6." */
-function formatDayLabel(dateKey: string): string {
+type TimeFields = { start: string; end: string };
+
+function toTimeFields(values: DayTimes | undefined): Record<string, TimeFields> {
+  const result: Record<string, TimeFields> = {};
+  for (const [date, time] of Object.entries(values ?? {})) {
+    result[date] = { start: time?.start ?? "", end: time?.end ?? "" };
+  }
+  return result;
+}
+
+/** 1 dan, 2 dneva, 3 dnevi, 5 dni */
+function daysWord(n: number): string {
+  if (n === 1) return "dan";
+  if (n === 2) return "dneva";
+  if (n === 3 || n === 4) return "dnevi";
+  return "dni";
+}
+
+/** "YYYY-MM-DD" -> "Pon 6." (oz. "Pon 6. 10.", če projekt sega čez več mesecev) */
+function formatDayLabel(dateKey: string, withMonth = false): string {
   const [y, m, d] = dateKey.split("-").map(Number);
   const weekday = SLOVENIAN_WEEKDAYS_SHORT[(new Date(y, m - 1, d).getDay() + 6) % 7];
-  return `${weekday} ${d}.`;
+  return withMonth ? `${weekday} ${d}. ${m}.` : `${weekday} ${d}.`;
 }
 
 function initialMonth(project?: ProjectWithClient): { year: number; month: number } {
@@ -148,6 +177,12 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
   );
   // Relacija, ki jo uporabnik trenutno dodeljuje posameznim dnem (klik na dan).
   const [pickingRoute, setPickingRoute] = useState<FuelRoute | null>(null);
+  // Dnevi, ko se pelješ s kolegom in si strošek goriva delita na pol.
+  const [sharedDates, setSharedDates] = useState<Set<string>>(
+    () => new Set(project?.fuel_shared_dates ?? [])
+  );
+  // Način izbire deljenih dni (klik na dan preklopi ½).
+  const [pickingShared, setPickingShared] = useState(false);
   const [fuelConsumption, setFuelConsumption] = useState(
     String(project?.fuel_consumption ?? DEFAULT_FUEL_CONSUMPTION)
   );
@@ -174,6 +209,13 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
       ? String(Math.round((project.revenue - sumCostItems(project.extra_items)) * 100) / 100)
       : ""
   );
+  // Mesec obračuna: "" = samodejno (mesec zadnjega delovnega dne).
+  const [billingMonth, setBillingMonth] = useState(project?.billing_month ?? "");
+  // Čas od-do in opomba po dnevih projekta.
+  const [dayTimes, setDayTimes] = useState<Record<string, TimeFields>>(() =>
+    toTimeFields(project?.day_times)
+  );
+  const [dayNotes, setDayNotes] = useState<DayNotes>(() => ({ ...(project?.day_notes ?? {}) }));
   const [note, setNote] = useState(project?.note ?? "");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -181,43 +223,75 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
   const selectedClientColor =
     clients.find((c) => c.id === clientId)?.color ?? "#3B82F6";
 
-  // Barve dni iz koledarja (obstoječi delovni vnosi za trenutno izbrani mesec),
-  // da je izbira dni projekta vizualno usklajena z zavihkom Koledar.
-  const [monthEntries, setMonthEntries] = useState<WorkEntryWithClient[]>([]);
+  // Barve dni iz koledarja (drugi projekti v trenutno izbranem mesecu), da je
+  // izbira dni projekta vizualno usklajena z zavihkom Koledar.
+  const [monthProjects, setMonthProjects] = useState<ProjectWithClient[]>([]);
 
-  const loadMonthEntries = useCallback(async () => {
+  const loadMonthProjects = useCallback(async () => {
     const supabase = createClient();
     const { from, to } = getMonthRange(year, month);
-    const data = await getWorkEntriesInRange(supabase, from, to);
-    setMonthEntries(data);
-  }, [year, month]);
+    const data = await getProjectsInRange(supabase, from, to);
+    setMonthProjects(data.filter((p) => p.id !== project?.id));
+  }, [year, month, project?.id]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadMonthEntries();
-  }, [loadMonthEntries]);
+    loadMonthProjects();
+  }, [loadMonthProjects]);
 
   const dayColors = useMemo(() => {
     const map = new Map<string, string>();
-    for (const entry of monthEntries) {
-      if (!entry.clients || map.has(entry.work_date)) continue;
-      map.set(entry.work_date, entry.clients.color);
+    for (const other of monthProjects) {
+      if (!other.clients) continue;
+      for (const date of other.work_dates) {
+        if (!map.has(date)) map.set(date, other.clients.color);
+      }
     }
     return map;
-  }, [monthEntries]);
+  }, [monthProjects]);
 
-  // dateKey -> client_id, da ob izbiri dneva z vnosom v koledarju samodejno
-  // izberemo pravo stranko v obrazcu.
+  // dateKey -> client_id, da ob izbiri dneva, ki je že v drugem projektu,
+  // samodejno izberemo pravo stranko v obrazcu.
   const dayClientIds = useMemo(() => {
     const map = new Map<string, string>();
-    for (const entry of monthEntries) {
-      if (map.has(entry.work_date)) continue;
-      map.set(entry.work_date, entry.client_id);
+    for (const other of monthProjects) {
+      for (const date of other.work_dates) {
+        if (!map.has(date)) map.set(date, other.client_id);
+      }
     }
     return map;
-  }, [monthEntries]);
+  }, [monthProjects]);
 
   const sortedSelectedDates = useMemo(() => [...selectedDates].sort(), [selectedDates]);
+
+  // Projekt lahko sega čez več mesecev; izbor dni ostane ob listanju po mesecih.
+  const selectedMonths = useMemo(() => workMonths(sortedSelectedDates), [sortedSelectedDates]);
+  const spansMonths = selectedMonths.length > 1;
+  const currentMonthKey = `${year}-${String(month + 1).padStart(2, "0")}`;
+  const dayCountByMonth = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const date of sortedSelectedDates) {
+      const key = monthKeyOf(date);
+      map.set(key, (map.get(key) ?? 0) + 1);
+    }
+    return map;
+  }, [sortedSelectedDates]);
+
+  // Ponujeni meseci obračuna: od prvega meseca dela do dva meseca po zadnjem
+  // (račun se pogosto izda ali plača kasneje).
+  const billingMonthOptions = useMemo(() => {
+    if (selectedMonths.length === 0) return [];
+    const last = addMonths(selectedMonths[selectedMonths.length - 1], 2);
+    const options: string[] = [];
+    for (let key = selectedMonths[0]; key <= last; key = addMonths(key, 1)) {
+      options.push(key);
+    }
+    if (billingMonth && !options.includes(billingMonth)) {
+      options.push(billingMonth);
+      options.sort();
+    }
+    return options;
+  }, [selectedMonths, billingMonth]);
 
   // Gorivo: km po izbranih dnevih × poraba × cena dizla.
   const totalKm = useMemo(
@@ -226,7 +300,19 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
   );
   const consumptionNum = Number(fuelConsumption) || 0;
   const fuelPriceNum = Number(fuelPrice) || 0;
-  const totalFuelCost = fuelCost(totalKm, consumptionNum, fuelPriceNum);
+  // Km, ki jih plačaš sam: deljeni dnevi štejejo pol.
+  const payableKm = useMemo(
+    () =>
+      sortedSelectedDates.reduce((sum, d) => {
+        const km = Number(dayKm[d]) || 0;
+        return sum + (sharedDates.has(d) ? km * SHARED_FUEL_FACTOR : km);
+      }, 0),
+    [sortedSelectedDates, dayKm, sharedDates]
+  );
+  const sharedDayCount = sortedSelectedDates.filter(
+    (d) => sharedDates.has(d) && (Number(dayKm[d]) || 0) > 0
+  ).length;
+  const totalFuelCost = fuelCost(payableKm, consumptionNum, fuelPriceNum);
 
   const otherCosts = useMemo(() => sumItemFields(costItems), [costItems]);
   const extrasTotal = useMemo(() => sumItemFields(extraItems), [extraItems]);
@@ -249,6 +335,37 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
 
   function updateDayHours(dateKey: string, value: string) {
     setDayHours((prev) => ({ ...prev, [dateKey]: value }));
+  }
+
+  // Ob vpisu časa od-do se ure dneva izračunajo samodejno.
+  function updateDayTime(dateKey: string, field: keyof TimeFields, value: string) {
+    const current = dayTimes[dateKey] ?? { start: "", end: "" };
+    const next = { ...current, [field]: value };
+    setDayTimes((prev) => ({ ...prev, [dateKey]: next }));
+    const hours = hoursBetween(next.start || null, next.end || null);
+    if (hours !== null) setDayHours((prev) => ({ ...prev, [dateKey]: String(hours) }));
+  }
+
+  function updateDayNote(dateKey: string, value: string) {
+    setDayNotes((prev) => ({ ...prev, [dateKey]: value }));
+  }
+
+  // Čas (in ure) prvega dne prepiše na vse izbrane dni.
+  function copyFirstDayTime() {
+    const first = sortedSelectedDates[0];
+    if (!first) return;
+    const time = dayTimes[first] ?? { start: "", end: "" };
+    const hours = dayHours[first] ?? "";
+    setDayTimes((prev) => {
+      const next = { ...prev };
+      for (const date of sortedSelectedDates) next[date] = { ...time };
+      return next;
+    });
+    setDayHours((prev) => {
+      const next = { ...prev };
+      for (const date of sortedSelectedDates) next[date] = hours;
+      return next;
+    });
   }
 
   function updateDayKm(dateKey: string, value: string) {
@@ -274,14 +391,28 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
     }));
   }
 
+  // Menjava meseca samo prikaže drug mesec - izbrani dnevi iz drugih mesecev
+  // ostanejo (projekt lahko sega čez več mesecev).
+  function toggleSharedDay(dateKey: string) {
+    setSharedDates((prev) => {
+      const next = new Set(prev);
+      if (next.has(dateKey)) next.delete(dateKey);
+      else next.add(dateKey);
+      return next;
+    });
+  }
+
+  function setAllShared(shared: boolean) {
+    setSharedDates(shared ? new Set(sortedSelectedDates) : new Set());
+  }
+
   function handleYearMonthChange(nextYear: number, nextMonth: number) {
     setYearMonth({ year: nextYear, month: nextMonth });
-    // Ob spremembi meseca odstranimo dneve, ki ne spadajo več v izbrani mesec.
-    setSelectedDates((prev) => {
-      const prefix = `${nextYear}-${String(nextMonth + 1).padStart(2, "0")}`;
-      const filtered = [...prev].filter((key) => key.startsWith(prefix));
-      return new Set(filtered);
-    });
+  }
+
+  function jumpToMonth(key: string) {
+    const [y, m] = key.split("-").map(Number);
+    setYearMonth({ year: y, month: m - 1 });
   }
 
   function toggleDay(dateKey: string) {
@@ -363,6 +494,21 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
       return;
     }
 
+    const day_times: DayTimes = {};
+    const day_notes: DayNotes = {};
+    for (const date of selectedDates) {
+      const time = dayTimes[date];
+      if (time && (time.start || time.end)) {
+        if (time.start && time.end && time.end <= time.start) {
+          setError(`${formatDayLabel(date, true)}: čas konca mora biti za časom začetka.`);
+          return;
+        }
+        day_times[date] = { start: time.start || null, end: time.end || null };
+      }
+      const dayNote = dayNotes[date]?.trim();
+      if (dayNote) day_notes[date] = dayNote;
+    }
+
     const input: ProjectInput = {
       name: name.trim(),
       client_id: clientId,
@@ -374,7 +520,11 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
       day_km,
       fuel_consumption: hasFuel ? consumptionNum : null,
       fuel_price: hasFuel ? fuelPriceNum : null,
+      fuel_shared_dates: [...sharedDates].filter((d) => day_km[d] > 0),
+      day_times,
+      day_notes,
       revenue: effectiveRevenue,
+      billing_month: billingMonth || null,
       note: note.trim() || null,
     };
 
@@ -437,8 +587,138 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
             color={selectedClientColor}
             dayColors={dayColors}
           />
+
+          {/* Izbrani dnevi po mesecih - klik skoči na mesec. */}
+          {(spansMonths ||
+            (selectedMonths.length === 1 && selectedMonths[0] !== currentMonthKey)) && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-xs text-gray-500 dark:text-gray-400">Izbrano:</span>
+              {selectedMonths.map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => jumpToMonth(key)}
+                  className={clsx(
+                    ROUTE_CHIP_CLASS,
+                    key === currentMonthKey && "ring-1 ring-blue-500 dark:ring-blue-600"
+                  )}
+                >
+                  {formatMonthKey(key)} ({dayCountByMonth.get(key)})
+                </button>
+              ))}
+            </div>
+          )}
+
+          {selectedMonths.length > 0 && (
+            <div className="border-t border-gray-100 pt-3 dark:border-gray-800">
+              <Field label="Mesec obračuna" htmlFor="billing_month">
+                <select
+                  id="billing_month"
+                  value={billingMonth}
+                  onChange={(e) => setBillingMonth(e.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:[color-scheme:dark] sm:w-64"
+                >
+                  <option value="">
+                    Samodejno – {formatMonthKey(autoBillingMonth(sortedSelectedDates))}
+                  </option>
+                  {billingMonthOptions.map((key) => (
+                    <option key={key} value={key}>
+                      {formatMonthKey(key)}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Priliv in stroški projekta se v pregledu financ štejejo v ta mesec.
+              </p>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Delovni čas po dnevih: od-do, ure (pri urnem obračunu) in opomba. */}
+      <Collapsible
+        title="Delovni čas po dnevih"
+        summary={
+          sortedSelectedDates.length === 0
+            ? undefined
+            : `${sortedSelectedDates.length} ${daysWord(sortedSelectedDates.length)}${
+                billing === "hourly" && totalHours > 0 ? ` · ${formatHours(totalHours)}` : ""
+              }`
+        }
+        defaultOpen={!project}
+      >
+        {sortedSelectedDates.length === 0 ? (
+          NO_DAYS_HINT
+        ) : (
+          <>
+            {sortedSelectedDates.length > 1 && (
+              <button type="button" className={ROUTE_CHIP_CLASS} onClick={copyFirstDayTime}>
+                Čas prvega dne za vse dni
+              </button>
+            )}
+            <div className="space-y-2">
+              {sortedSelectedDates.map((date) => {
+                const time = dayTimes[date] ?? { start: "", end: "" };
+                return (
+                  <div
+                    key={date}
+                    className="rounded-md border border-gray-200 p-2 dark:border-gray-800"
+                  >
+                    <span className={DAY_CELL_LABEL_CLASS}>
+                      {formatDayLabel(date, spansMonths)}
+                    </span>
+                    <div
+                      className={clsx(
+                        "grid gap-2",
+                        billing === "hourly"
+                          ? "grid-cols-3 sm:grid-cols-[7rem_7rem_5rem_1fr]"
+                          : "grid-cols-2 sm:grid-cols-[7rem_7rem_1fr]"
+                      )}
+                    >
+                      <Input
+                        type="time"
+                        aria-label={`Od - ${formatDayLabel(date, true)}`}
+                        title="Od"
+                        value={time.start}
+                        onChange={(e) => updateDayTime(date, "start", e.target.value)}
+                      />
+                      <Input
+                        type="time"
+                        aria-label={`Do - ${formatDayLabel(date, true)}`}
+                        title="Do"
+                        value={time.end}
+                        onChange={(e) => updateDayTime(date, "end", e.target.value)}
+                      />
+                      {billing === "hourly" && (
+                        <Input
+                          type="number"
+                          inputMode="decimal"
+                          step="0.25"
+                          min="0"
+                          max="24"
+                          placeholder="ure"
+                          aria-label={`Ure - ${formatDayLabel(date, true)}`}
+                          title="Ure"
+                          value={dayHours[date] ?? ""}
+                          onChange={(e) => updateDayHours(date, e.target.value)}
+                        />
+                      )}
+                      <Input
+                        placeholder="Opomba dneva"
+                        aria-label={`Opomba - ${formatDayLabel(date, true)}`}
+                        className={billing === "hourly" ? "col-span-3 sm:col-span-1" : "col-span-2 sm:col-span-1"}
+                        value={dayNotes[date] ?? ""}
+                        onChange={(e) => updateDayNote(date, e.target.value)}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </Collapsible>
 
       {/* Obračun: na uro (ure × cena na uro) ali na projekt (ročen priliv). */}
       <Collapsible title="Obračun" summary={formatEUR(baseRevenue)} defaultOpen>
@@ -483,43 +763,16 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
               </Field>
             </div>
 
-            <div>
-              <span className={SECTION_LABEL_CLASS}>Ure po dnevih</span>
-              {sortedSelectedDates.length === 0 ? (
-                NO_DAYS_HINT
-              ) : (
-                <div className={DAY_GRID_CLASS}>
-                  {sortedSelectedDates.map((date) => (
-                    <div
-                      key={date}
-                      className="rounded-md border border-gray-200 p-2 dark:border-gray-800"
-                    >
-                      <label htmlFor={`hours-${date}`} className={DAY_CELL_LABEL_CLASS}>
-                        {formatDayLabel(date)}
-                      </label>
-                      <Input
-                        id={`hours-${date}`}
-                        type="number"
-                        inputMode="decimal"
-                        step="0.5"
-                        min="0"
-                        max="24"
-                        placeholder="0"
-                        value={dayHours[date] ?? ""}
-                        onChange={(e) => updateDayHours(date, e.target.value)}
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
             <p className="text-sm text-gray-600 dark:text-gray-400">
               {formatHours(totalHours)} × {formatEUR(rateNum)}/h ={" "}
               <span className="font-semibold text-gray-900 dark:text-gray-100">
                 {formatEUR(projectValue)}
               </span>
               {extrasTotal > 0 && ` (+ ${formatEUR(extrasTotal)} dodatne storitve)`}
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Ure vpiši v razdelku &quot;Delovni čas po dnevih&quot; (iz časa od–do se
+              izračunajo same).
             </p>
           </>
         ) : (
@@ -540,7 +793,6 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
       <Collapsible
         title="Stroški"
         summary={formatEUR(totalCosts)}
-        defaultOpen={totalCosts > 0}
       >
         <Collapsible
           nested
@@ -597,7 +849,20 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
           </p>
 
           {sortedSelectedDates.length > 0 &&
-            (pickingRoute ? (
+            (pickingShared ? (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-amber-50 px-2.5 py-1.5 dark:bg-amber-950/40">
+                <span className="text-xs text-amber-700 dark:text-amber-300">
+                  Klikni dneve, ko se pelješ s kolegom (½ stroška goriva)
+                </span>
+                <button
+                  type="button"
+                  className={ROUTE_CHIP_CLASS}
+                  onClick={() => setPickingShared(false)}
+                >
+                  Končano
+                </button>
+              </div>
+            ) : pickingRoute ? (
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-blue-50 px-2.5 py-1.5 dark:bg-blue-950/40">
                 <span className="text-xs text-blue-700 dark:text-blue-300">
                   Klikni dneve za relacijo {pickingRoute.label} (
@@ -632,11 +897,68 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
                     Posamezni dnevi
                   </button>
                 </div>
-              ))
+              )).concat(
+                <div key="shared" className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    Deljeno s kolegom (½):
+                  </span>
+                  <button
+                    type="button"
+                    className={ROUTE_CHIP_CLASS}
+                    onClick={() => setAllShared(true)}
+                  >
+                    Vsi dnevi
+                  </button>
+                  <button
+                    type="button"
+                    className={ROUTE_CHIP_CLASS}
+                    onClick={() => setPickingShared(true)}
+                  >
+                    Posamezni dnevi
+                  </button>
+                  {sharedDates.size > 0 && (
+                    <button
+                      type="button"
+                      className={ROUTE_CHIP_CLASS}
+                      onClick={() => setAllShared(false)}
+                    >
+                      Nobeden
+                    </button>
+                  )}
+                </div>
+              )
             ))}
 
           {sortedSelectedDates.length === 0 ? (
             NO_DAYS_HINT
+          ) : pickingShared ? (
+            <div className={DAY_GRID_CLASS}>
+              {sortedSelectedDates.map((date) => {
+                const shared = sharedDates.has(date);
+                return (
+                  <button
+                    key={date}
+                    type="button"
+                    aria-pressed={shared}
+                    onClick={() => toggleSharedDay(date)}
+                    className={
+                      "rounded-md border-2 p-2 text-left transition-colors " +
+                      (shared
+                        ? "border-amber-500 bg-amber-50 dark:bg-amber-950/40"
+                        : "border-gray-200 bg-white hover:border-amber-300 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-amber-800")
+                    }
+                  >
+                    <span className="block text-xs font-medium text-gray-600 dark:text-gray-400">
+                      {formatDayLabel(date, spansMonths)}
+                    </span>
+                    <span className="block text-sm text-gray-900 dark:text-gray-100">
+                      {dayKm[date] ? formatKm(Number(dayKm[date]) || 0) : "–"}
+                      {shared && " · ½"}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           ) : pickingRoute ? (
             <div className={DAY_GRID_CLASS}>
               {sortedSelectedDates.map((date) => {
@@ -655,7 +977,7 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
                     }
                   >
                     <span className="block text-xs font-medium text-gray-600 dark:text-gray-400">
-                      {formatDayLabel(date)}
+                      {formatDayLabel(date, spansMonths)}
                     </span>
                     <span className="block text-sm text-gray-900 dark:text-gray-100">
                       {dayKm[date] ? formatKm(Number(dayKm[date]) || 0) : "–"}
@@ -672,7 +994,10 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
                   className="rounded-md border border-gray-200 bg-white p-2 dark:border-gray-800 dark:bg-gray-900"
                 >
                   <label htmlFor={`km-${date}`} className={DAY_CELL_LABEL_CLASS}>
-                    {formatDayLabel(date)}
+                    {formatDayLabel(date, spansMonths)}
+                    {sharedDates.has(date) && (
+                      <span className="ml-1 text-amber-600 dark:text-amber-400">½</span>
+                    )}
                   </label>
                   <Input
                     id={`km-${date}`}
@@ -691,8 +1016,19 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
 
           {totalKm > 0 && (
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              {formatKm(totalKm)} ·{" "}
-              {fuelLiters(totalKm, consumptionNum).toLocaleString("sl-SI", {
+              {formatKm(totalKm)}
+              {sharedDayCount > 0 &&
+                ` (plačaš ${formatKm(payableKm)}, ½ deljeno: ${sharedDayCount} ${
+                  sharedDayCount === 1
+                    ? "dan"
+                    : sharedDayCount === 2
+                      ? "dneva"
+                      : sharedDayCount <= 4
+                        ? "dnevi"
+                        : "dni"
+                })`}{" "}
+              ·{" "}
+              {fuelLiters(payableKm, consumptionNum).toLocaleString("sl-SI", {
                 maximumFractionDigits: 1,
               })}{" "}
               l ·{" "}
@@ -723,7 +1059,6 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
         compact
         title="Dodatne storitve"
         summary={formatEUR(extrasTotal)}
-        defaultOpen={extrasTotal > 0}
       >
         <ItemRows
           items={extraItems}
@@ -761,7 +1096,7 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
         </div>
       </div>
 
-      <Collapsible title="Opomba" summary={notePreview(note)} defaultOpen={Boolean(note)}>
+      <Collapsible title="Opomba" summary={notePreview(note)}>
         <Textarea
           id="note"
           aria-label="Opomba"

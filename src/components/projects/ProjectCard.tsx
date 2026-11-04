@@ -17,14 +17,32 @@ import {
   sumDayKm,
 } from "@/lib/utils/projectCosts";
 import { SLOVENIAN_MONTHS } from "@/lib/utils/date";
+import {
+  formatMonthKey,
+  monthKeyOf,
+  projectBillingMonth,
+  workMonths,
+} from "@/lib/utils/projectMonths";
 
 // Na računalniku (md+) manjši gumbi enake širine, zloženi drug nad drugim.
 const CARD_BUTTON_CLASS = "md:w-full md:px-2.5 md:py-1 md:text-xs";
 
+// "22, 23. Oktober · 2, 3, 4. November 2026" - dnevi po mesecih; leto se
+// izpiše ob vsakem mesecu le, če projekt sega čez novo leto.
 function formatDaysLabel(project: ProjectWithClient): string {
-  const [year, month] = project.work_dates[0].split("-").map(Number);
-  const days = project.work_dates.map((d) => Number(d.slice(8, 10)));
-  return `${days.join(", ")}. ${SLOVENIAN_MONTHS[month - 1]} ${year}`;
+  const dates = [...project.work_dates].sort();
+  const months = workMonths(dates);
+  const multiYear = new Set(months.map((key) => key.slice(0, 4))).size > 1;
+  return months
+    .map((key, i) => {
+      const [year, month] = key.split("-").map(Number);
+      const days = dates
+        .filter((d) => monthKeyOf(d) === key)
+        .map((d) => Number(d.slice(8, 10)));
+      const withYear = multiYear || i === months.length - 1;
+      return `${days.join(", ")}. ${SLOVENIAN_MONTHS[month - 1]}${withYear ? ` ${year}` : ""}`;
+    })
+    .join(" · ");
 }
 
 export default function ProjectCard({ project }: { project: ProjectWithClient }) {
@@ -52,9 +70,19 @@ export default function ProjectCard({ project }: { project: ProjectWithClient })
         }`
       : null;
   const fuelLabel =
-    fuel > 0 ? `Gorivo: ${formatEUR(fuel)} (${formatKm(totalKm)})` : null;
+    fuel > 0
+      ? `Gorivo: ${formatEUR(fuel)} (${formatKm(totalKm)}${
+          (project.fuel_shared_dates ?? []).length > 0 ? ", ½ deljeno" : ""
+        })`
+      : null;
 
   const clientColor = project.clients?.color ?? "#9CA3AF";
+
+  // Pri projektu čez več mesecev (ali z ročno izbranim mesecem) pokažemo,
+  // v kateri mesec se šteje.
+  const billingMonth = projectBillingMonth(project);
+  const showBillingMonth =
+    workMonths(project.work_dates).length > 1 || project.billing_month != null;
 
   return (
     <div
@@ -78,6 +106,12 @@ export default function ProjectCard({ project }: { project: ProjectWithClient })
               <span className="hidden md:inline">· </span>
               {formatDaysLabel(project)}
             </span>
+            {showBillingMonth && (
+              <span className="basis-full text-xs text-blue-600 dark:text-blue-400 md:basis-auto">
+                <span className="hidden md:inline">· </span>
+                Obračun: {formatMonthKey(billingMonth)}
+              </span>
+            )}
           </div>
         </div>
 

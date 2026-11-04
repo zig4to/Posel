@@ -11,6 +11,11 @@ export type CostItem = {
 export type DayHours = Record<string, number>;
 /** Prevoženi km po dnevih projekta: { "YYYY-MM-DD": km }. */
 export type DayKm = Record<string, number>;
+/** Čas dela po dnevih projekta: { "YYYY-MM-DD": { start: "08:00", end: "16:00" } }. */
+export type DayTime = { start: string | null; end: string | null };
+export type DayTimes = Record<string, DayTime>;
+/** Opomba po dnevih projekta: { "YYYY-MM-DD": "besedilo" }. */
+export type DayNotes = Record<string, string>;
 
 export type Database = {
   public: {
@@ -119,9 +124,15 @@ export type Database = {
           day_hours: DayHours;
           hourly_rate: number | null;
           day_km: DayKm;
+          day_times: DayTimes;
+          day_notes: DayNotes;
           fuel_consumption: number | null;
           fuel_price: number | null;
+          /** Dnevi z deljenim stroškom goriva (½). */
+          fuel_shared_dates: string[];
           revenue: number;
+          /** "YYYY-MM"; null = mesec zadnjega delovnega dne. */
+          billing_month: string | null;
           note: string | null;
           created_at: string;
           updated_at: string;
@@ -137,9 +148,13 @@ export type Database = {
           day_hours?: DayHours;
           hourly_rate?: number | null;
           day_km?: DayKm;
+          day_times?: DayTimes;
+          day_notes?: DayNotes;
           fuel_consumption?: number | null;
           fuel_price?: number | null;
+          fuel_shared_dates?: string[];
           revenue?: number;
+          billing_month?: string | null;
           note?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -155,9 +170,13 @@ export type Database = {
           day_hours?: DayHours;
           hourly_rate?: number | null;
           day_km?: DayKm;
+          day_times?: DayTimes;
+          day_notes?: DayNotes;
           fuel_consumption?: number | null;
           fuel_price?: number | null;
+          fuel_shared_dates?: string[];
           revenue?: number;
+          billing_month?: string | null;
           note?: string | null;
           created_at?: string;
           updated_at?: string;

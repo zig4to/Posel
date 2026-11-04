@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import MonthYearPicker from "@/components/calendar/MonthYearPicker";
 import Button from "@/components/ui/Button";
 import { createClient } from "@/lib/supabase/client";
-import { getWorkEntriesInRange } from "@/lib/data/workEntries";
+import { getProjectsInRange } from "@/lib/data/projects";
 import { getLeavesInRange } from "@/lib/data/leaves";
 import {
   getMonthGrid,
@@ -295,14 +295,16 @@ export default function CalendarSnapshot() {
     try {
       const supabase = createClient();
       const { from, to } = getMonthRange(year, month);
-      const [entries, leaves] = await Promise.all([
-        getWorkEntriesInRange(supabase, from, to),
+      const [projects, leaves] = await Promise.all([
+        getProjectsInRange(supabase, from, to),
         getLeavesInRange(supabase, from, to),
       ]);
       const dayColors = new Map<string, string>();
-      for (const entry of entries) {
-        if (!entry.clients || dayColors.has(entry.work_date)) continue;
-        dayColors.set(entry.work_date, entry.clients.color);
+      for (const project of projects) {
+        if (!project.clients) continue;
+        for (const date of project.work_dates) {
+          if (!dayColors.has(date)) dayColors.set(date, project.clients.color);
+        }
       }
       const dayLeaveColors = new Map<string, string>();
       for (const day of getMonthGrid(year, month)) {

@@ -34,17 +34,40 @@ export function fuelCost(km: number, consumption: number, price: number): number
   return Math.round(fuelLiters(km, consumption) * price * 100) / 100;
 }
 
-export function projectFuelCost(
-  project: Pick<Project, "day_km" | "fuel_consumption" | "fuel_price">
+/** Delež goriva, ki ga plačaš sam na deljen dan (s kolegom na pol). */
+export const SHARED_FUEL_FACTOR = 0.5;
+
+/**
+ * Km, ki jih plačaš sam: deljeni dnevi štejejo pol. Če je podan `dates`,
+ * upošteva samo te dni.
+ */
+export function payableKm(
+  dayKm: DayKm | null | undefined,
+  sharedDates: string[] | null | undefined,
+  dates?: string[]
 ): number {
-  const km = sumDayKm(project.day_km);
+  const shared = new Set(sharedDates ?? []);
+  const keys = dates ?? Object.keys(dayKm ?? {});
+  return keys.reduce((sum, d) => {
+    const km = dayKm?.[d] ?? 0;
+    return sum + (shared.has(d) ? km * SHARED_FUEL_FACTOR : km);
+  }, 0);
+}
+
+export function projectFuelCost(
+  project: Pick<Project, "day_km" | "fuel_consumption" | "fuel_price" | "fuel_shared_dates">
+): number {
+  const km = payableKm(project.day_km, project.fuel_shared_dates);
   if (!km || !project.fuel_consumption || !project.fuel_price) return 0;
   return fuelCost(km, project.fuel_consumption, project.fuel_price);
 }
 
 /** Vsi stroški projekta: postavke + gorivo. */
 export function projectTotalCosts(
-  project: Pick<Project, "cost_items" | "day_km" | "fuel_consumption" | "fuel_price">
+  project: Pick<
+    Project,
+    "cost_items" | "day_km" | "fuel_consumption" | "fuel_price" | "fuel_shared_dates"
+  >
 ): number {
   return sumCostItems(project.cost_items) + projectFuelCost(project);
 }
