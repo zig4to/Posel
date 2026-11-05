@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import Button from "@/components/ui/Button";
 import {
   formatDateKey,
@@ -17,9 +17,8 @@ type MonthDayPickerProps = {
   onAddRange: (fromKey: string, toKey: string) => void;
   /** Barva trenutno izbrane stranke v obrazcu (rezerva, če dan še nima vnosov v koledarju). */
   color: string;
-  /** dateKey -> barva stranke, ki ima ta dan že vnos v koledarju (isto kot na zavihku Koledar). */
-  dayColors: Map<string, string>;
-  /** Ali je prikazan vnos ur po dnevih (gumb "Beleži ure"). */
+  /** dateKey -> barve strank drugih projektov tega dne (isto kot na zavihku Koledar). */
+  dayColors: Map<string, string[]>;
 };
 
 export default function MonthDayPicker({
@@ -58,24 +57,39 @@ export default function MonthDayPicker({
             }
 
             const isSelected = selected.has(day.dateKey);
-            // Barva iz koledarja (obstoječi vnos tega dne) ima prednost pred
-            // barvo trenutno izbrane stranke v obrazcu - enako kot na Koledarju.
-            const borderColor =
-              dayColors.get(day.dateKey) ?? (isSelected ? color : undefined);
+            // Barve dneva: izbran dan v barvi tega projekta, nato barve drugih
+            // projektov iz koledarja. Ob dveh barvah je kvadratek razdeljen
+            // (zgoraj ena, spodaj druga) - enako kot na Koledarju.
+            const others = dayColors.get(day.dateKey) ?? [];
+            const colors = isSelected
+              ? [color, ...others.filter((c) => c !== color)]
+              : others;
+            const [first, second] = colors;
+
+            let style: CSSProperties | undefined;
+            if (first && second) {
+              style = {
+                borderColor: "transparent",
+                background: [
+                  `linear-gradient(to bottom, ${first}26 50%, ${second}26 50%) padding-box`,
+                  "linear-gradient(var(--cell-bg), var(--cell-bg)) padding-box",
+                  `linear-gradient(to bottom, ${first} 50%, ${second} 50%) border-box`,
+                ].join(", "),
+              };
+            } else if (first) {
+              style = { borderColor: first, backgroundColor: `${first}26` };
+            }
 
             return (
               <button
                 key={day.dateKey}
                 type="button"
                 onClick={() => onToggleDay(day.dateKey)}
-                style={
-                  borderColor
-                    ? { borderColor, backgroundColor: `${borderColor}26` }
-                    : undefined
-                }
+                style={style}
                 className={clsx(
                   "relative flex h-8 w-full items-center justify-center rounded-md text-sm font-medium transition-[filter,background-color,border-color]",
-                  borderColor
+                  "[--cell-bg:var(--color-white)] dark:[--cell-bg:var(--color-gray-900)]",
+                  first
                     ? "border-2 font-semibold text-gray-900 hover:brightness-95 dark:text-gray-100 dark:hover:brightness-110"
                     : "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
                 )}
@@ -147,11 +161,11 @@ export default function MonthDayPicker({
         </div>
       ) : (
         <div className="flex flex-wrap gap-2">
-          {/* Na telefonu nižji gumb (manj navpičnega odmika), na sm+ kot prej. */}
+          {/* Nizek gumb (manj navpičnega odmika), da ne zavzame preveč prostora. */}
           <Button
             type="button"
             variant="secondary"
-            className="max-sm:py-1 max-sm:text-xs"
+            className="py-0.5! text-xs!"
             onClick={() => setShowRangeForm(true)}
           >
             Razpon

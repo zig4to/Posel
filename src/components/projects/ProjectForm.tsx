@@ -17,6 +17,16 @@ import {
 import { Field, Input, Textarea } from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import Collapsible from "@/components/ui/Collapsible";
+import {
+  CalendarIcon,
+  ClockIcon,
+  EuroIcon,
+  FuelIcon,
+  NoteIcon,
+  PlusCircleIcon,
+  ReceiptIcon,
+  WalletIcon,
+} from "@/components/projects/SectionIcons";
 import MonthYearPicker from "@/components/calendar/MonthYearPicker";
 import MonthDayPicker from "@/components/projects/MonthDayPicker";
 import ItemRows, { EMPTY_ITEM, type ItemFields } from "@/components/projects/ItemRows";
@@ -67,6 +77,9 @@ const SECTION_LABEL_CLASS =
 
 const DAY_CELL_LABEL_CLASS =
   "mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400";
+
+// Nižja polja v kompaktnem seznamu delovnega časa (preglasijo privzeti odmik).
+const DAY_ROW_INPUT_CLASS = "px-2! py-1! text-sm";
 
 const DAY_GRID_CLASS = "grid grid-cols-3 gap-2 sm:grid-cols-5";
 
@@ -215,7 +228,14 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
   const [dayTimes, setDayTimes] = useState<Record<string, TimeFields>>(() =>
     toTimeFields(project?.day_times)
   );
+  // Privzeto se vpisuje samo število ur; čas od-do se razkrije z gumbom
+  // (samodejno, če ima projekt čas že vpisan).
+  const [showTimes, setShowTimes] = useState(
+    () => Object.keys(project?.day_times ?? {}).length > 0
+  );
   const [dayNotes, setDayNotes] = useState<DayNotes>(() => ({ ...(project?.day_notes ?? {}) }));
+  // Dnevi z odprtim poljem za opombo (privzeto so opombe zaprte za gumbom).
+  const [openNotes, setOpenNotes] = useState<Set<string>>(() => new Set());
   const [note, setNote] = useState(project?.note ?? "");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -239,12 +259,16 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
     loadMonthProjects();
   }, [loadMonthProjects]);
 
+  // dateKey -> barve strank drugih projektov tega dne (brez ponovitev).
   const dayColors = useMemo(() => {
-    const map = new Map<string, string>();
+    const map = new Map<string, string[]>();
     for (const other of monthProjects) {
       if (!other.clients) continue;
+      const c = other.clients.color;
       for (const date of other.work_dates) {
-        if (!map.has(date)) map.set(date, other.clients.color);
+        const list = map.get(date);
+        if (!list) map.set(date, [c]);
+        else if (!list.includes(c)) list.push(c);
       }
     }
     return map;
@@ -350,17 +374,28 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
     setDayNotes((prev) => ({ ...prev, [dateKey]: value }));
   }
 
+  function toggleNoteOpen(dateKey: string) {
+    setOpenNotes((prev) => {
+      const next = new Set(prev);
+      if (next.has(dateKey)) next.delete(dateKey);
+      else next.add(dateKey);
+      return next;
+    });
+  }
+
   // Čas (in ure) prvega dne prepiše na vse izbrane dni.
   function copyFirstDayTime() {
     const first = sortedSelectedDates[0];
     if (!first) return;
     const time = dayTimes[first] ?? { start: "", end: "" };
     const hours = dayHours[first] ?? "";
-    setDayTimes((prev) => {
-      const next = { ...prev };
-      for (const date of sortedSelectedDates) next[date] = { ...time };
-      return next;
-    });
+    if (showTimes) {
+      setDayTimes((prev) => {
+        const next = { ...prev };
+        for (const date of sortedSelectedDates) next[date] = { ...time };
+        return next;
+      });
+    }
     setDayHours((prev) => {
       const next = { ...prev };
       for (const date of sortedSelectedDates) next[date] = hours;
@@ -416,8 +451,10 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
   }
 
   function toggleDay(dateKey: string) {
+    // Stranko samodejno izberemo le ob prvem izbranem dnevu - kasneje dodan
+    // dan drugega projekta ne sme zamenjati stranke že izbranih dni.
     const isAdding = !selectedDates.has(dateKey);
-    if (isAdding) {
+    if (isAdding && selectedDates.size === 0) {
       const entryClientId = dayClientIds.get(dateKey);
       if (entryClientId) setClientId(entryClientId);
     }
@@ -438,7 +475,7 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
     // pripadajočo stranko (prvi tak dan v razponu).
     let cursor = new Date(fromKey);
     const end = new Date(toKey);
-    while (cursor <= end) {
+    while (selectedDates.size === 0 && cursor <= end) {
       const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-${String(
         cursor.getDate()
       ).padStart(2, "0")}`;
@@ -497,7 +534,8 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
     const day_times: DayTimes = {};
     const day_notes: DayNotes = {};
     for (const date of selectedDates) {
-      const time = dayTimes[date];
+      // Skrit čas od-do se ne shrani.
+      const time = showTimes ? dayTimes[date] : undefined;
       if (time && (time.start || time.end)) {
         if (time.start && time.end && time.end <= time.start) {
           setError(`${formatDayLabel(date, true)}: čas konca mora biti za časom začetka.`);
@@ -610,10 +648,16 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
           )}
 
           {selectedMonths.length > 0 && (
-            <div className="border-t border-gray-100 pt-3 dark:border-gray-800">
-              <Field label="Mesec obračuna" htmlFor="billing_month">
+            <Collapsible
+              nested
+              title="Mesec obračuna"
+              icon={<CalendarIcon />}
+              summary={formatMonthKey(billingMonth || autoBillingMonth(sortedSelectedDates))}
+            >
+              <div>
                 <select
                   id="billing_month"
+                  aria-label="Mesec obračuna"
                   value={billingMonth}
                   onChange={(e) => setBillingMonth(e.target.value)}
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:[color-scheme:dark] sm:w-64"
@@ -627,18 +671,21 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
                     </option>
                   ))}
                 </select>
-              </Field>
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Priliv in stroški projekta se v pregledu financ štejejo v ta mesec.
-              </p>
-            </div>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Priliv in stroški projekta se v pregledu financ štejejo v ta mesec.
+                </p>
+              </div>
+            </Collapsible>
           )}
         </div>
       </div>
 
+      {/* Zložljivi razdelki tesneje skupaj (manjši razmik kot med polji obrazca). */}
+      <div className="space-y-2">
       {/* Delovni čas po dnevih: od-do, ure (pri urnem obračunu) in opomba. */}
       <Collapsible
         title="Delovni čas po dnevih"
+        icon={<ClockIcon />}
         summary={
           sortedSelectedDates.length === 0
             ? undefined
@@ -652,66 +699,132 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
           NO_DAYS_HINT
         ) : (
           <>
-            {sortedSelectedDates.length > 1 && (
-              <button type="button" className={ROUTE_CHIP_CLASS} onClick={copyFirstDayTime}>
-                Čas prvega dne za vse dni
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                className={clsx(
+                  ROUTE_CHIP_CLASS,
+                  showTimes && "ring-1 ring-blue-500 dark:ring-blue-600"
+                )}
+                aria-pressed={showTimes}
+                onClick={() => setShowTimes((v) => !v)}
+              >
+                {showTimes ? "Skrij čas od–do" : "Dodaj čas od–do"}
               </button>
-            )}
-            <div className="space-y-2">
+              {sortedSelectedDates.length > 1 && (showTimes || billing === "hourly") && (
+                <button type="button" className={ROUTE_CHIP_CLASS} onClick={copyFirstDayTime}>
+                  {showTimes ? "Čas prvega dne za vse dni" : "Ure prvega dne za vse dni"}
+                </button>
+              )}
+            </div>
+            {/* Kompakten seznam dni: brez časa od-do v dveh stolpcih, s časom
+                v enem (sicer polja ne gredo v širino). Opomba je skrita za
+                gumbom, ki je obarvan, če je opomba vpisana. */}
+            <div
+              className={clsx(
+                "grid items-start gap-1.5",
+                showTimes ? "grid-cols-1" : "grid-cols-2"
+              )}
+            >
               {sortedSelectedDates.map((date) => {
                 const time = dayTimes[date] ?? { start: "", end: "" };
+                const hourly = billing === "hourly";
+                const label = formatDayLabel(date, true);
+                const dayNote = dayNotes[date] ?? "";
+                const hasNote = dayNote.trim() !== "";
+                const noteOpen = openNotes.has(date);
                 return (
                   <div
                     key={date}
-                    className="rounded-md border border-gray-200 p-2 dark:border-gray-800"
+                    className="flex flex-wrap items-center gap-1.5 rounded-md border border-gray-200 px-2 py-1.5 dark:border-gray-800"
                   >
-                    <span className={DAY_CELL_LABEL_CLASS}>
-                      {formatDayLabel(date, spansMonths)}
-                    </span>
-                    <div
+                    <span
                       className={clsx(
-                        "grid gap-2",
-                        billing === "hourly"
-                          ? "grid-cols-3 sm:grid-cols-[7rem_7rem_5rem_1fr]"
-                          : "grid-cols-2 sm:grid-cols-[7rem_7rem_1fr]"
+                        "shrink-0 text-xs font-medium text-gray-600 dark:text-gray-400",
+                        spansMonths ? "w-16" : "w-11"
                       )}
                     >
-                      <Input
-                        type="time"
-                        aria-label={`Od - ${formatDayLabel(date, true)}`}
-                        title="Od"
-                        value={time.start}
-                        onChange={(e) => updateDayTime(date, "start", e.target.value)}
-                      />
-                      <Input
-                        type="time"
-                        aria-label={`Do - ${formatDayLabel(date, true)}`}
-                        title="Do"
-                        value={time.end}
-                        onChange={(e) => updateDayTime(date, "end", e.target.value)}
-                      />
-                      {billing === "hourly" && (
+                      {formatDayLabel(date, spansMonths)}
+                    </span>
+                    {showTimes && (
+                      <>
                         <Input
-                          type="number"
-                          inputMode="decimal"
-                          step="0.25"
-                          min="0"
-                          max="24"
-                          placeholder="ure"
-                          aria-label={`Ure - ${formatDayLabel(date, true)}`}
-                          title="Ure"
-                          value={dayHours[date] ?? ""}
-                          onChange={(e) => updateDayHours(date, e.target.value)}
+                          type="time"
+                          aria-label={`Od - ${label}`}
+                          title="Od"
+                          className={clsx(DAY_ROW_INPUT_CLASS, "w-[5.75rem]!")}
+                          value={time.start}
+                          onChange={(e) => updateDayTime(date, "start", e.target.value)}
+                        />
+                        <span className="text-xs text-gray-400 dark:text-gray-500">–</span>
+                        <Input
+                          type="time"
+                          aria-label={`Do - ${label}`}
+                          title="Do"
+                          className={clsx(DAY_ROW_INPUT_CLASS, "w-[5.75rem]!")}
+                          value={time.end}
+                          onChange={(e) => updateDayTime(date, "end", e.target.value)}
+                        />
+                      </>
+                    )}
+                    {hourly && (
+                      <Input
+                        type="number"
+                        inputMode="decimal"
+                        step="0.25"
+                        min="0"
+                        max="24"
+                        placeholder="ure"
+                        aria-label={`Ure - ${label}`}
+                        title="Ure"
+                        className={clsx(DAY_ROW_INPUT_CLASS, "w-16! text-right")}
+                        value={dayHours[date] ?? ""}
+                        onChange={(e) => updateDayHours(date, e.target.value)}
+                      />
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => toggleNoteOpen(date)}
+                      aria-expanded={noteOpen}
+                      aria-label={`${hasNote ? "Opomba (vpisana)" : "Dodaj opombo"} - ${label}`}
+                      title={hasNote ? dayNote : "Dodaj opombo"}
+                      className={clsx(
+                        "relative ml-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-md border transition-colors",
+                        hasNote
+                          ? "border-blue-300 bg-blue-50 text-blue-600 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-400"
+                          : "border-gray-200 text-gray-400 hover:bg-gray-50 hover:text-gray-600 dark:border-gray-700 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-300",
+                        noteOpen && "ring-1 ring-blue-500 dark:ring-blue-600"
+                      )}
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="h-4 w-4"
+                        aria-hidden="true"
+                      >
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                      </svg>
+                      {hasNote && (
+                        <span
+                          className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-blue-600 dark:bg-blue-400"
+                          aria-hidden="true"
                         />
                       )}
+                    </button>
+                    {noteOpen && (
                       <Input
+                        autoFocus
                         placeholder="Opomba dneva"
-                        aria-label={`Opomba - ${formatDayLabel(date, true)}`}
-                        className={billing === "hourly" ? "col-span-3 sm:col-span-1" : "col-span-2 sm:col-span-1"}
-                        value={dayNotes[date] ?? ""}
+                        aria-label={`Opomba - ${label}`}
+                        className={clsx(DAY_ROW_INPUT_CLASS, "basis-full")}
+                        value={dayNote}
                         onChange={(e) => updateDayNote(date, e.target.value)}
                       />
-                    </div>
+                    )}
                   </div>
                 );
               })}
@@ -721,7 +834,7 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
       </Collapsible>
 
       {/* Obračun: na uro (ure × cena na uro) ali na projekt (ročen priliv). */}
-      <Collapsible title="Obračun" summary={formatEUR(baseRevenue)} defaultOpen>
+      <Collapsible title="Obračun" icon={<EuroIcon />} summary={formatEUR(baseRevenue)} defaultOpen>
         <div
           role="radiogroup"
           aria-label="Način obračuna"
@@ -771,8 +884,8 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
               {extrasTotal > 0 && ` (+ ${formatEUR(extrasTotal)} dodatne storitve)`}
             </p>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Ure vpiši v razdelku &quot;Delovni čas po dnevih&quot; (iz časa od–do se
-              izračunajo same).
+              Ure vpiši v razdelku &quot;Delovni čas po dnevih&quot; (če dodaš čas od–do,
+              se izračunajo same).
             </p>
           </>
         ) : (
@@ -792,11 +905,13 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
 
       <Collapsible
         title="Stroški"
+        icon={<WalletIcon />}
         summary={formatEUR(totalCosts)}
       >
         <Collapsible
           nested
           title="Gorivo (dizel)"
+          icon={<FuelIcon />}
           summary={
             totalKm > 0
               ? `${formatKm(totalKm)} · ${formatEUR(totalFuelCost)}`
@@ -1042,6 +1157,7 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
         <Collapsible
           nested
           title="Ostali stroški"
+          icon={<ReceiptIcon />}
           summary={formatEUR(otherCosts)}
           defaultOpen={otherCosts > 0}
         >
@@ -1056,8 +1172,8 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
 
       {/* Dodatne storitve: zaračunane poleg osnovnega obračuna, prištejejo se prilivu. */}
       <Collapsible
-        compact
         title="Dodatne storitve"
+        icon={<PlusCircleIcon />}
         summary={formatEUR(extrasTotal)}
       >
         <ItemRows
@@ -1068,6 +1184,22 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
           notePlaceholder="Opis storitve"
         />
       </Collapsible>
+
+      <Collapsible title="Opomba" icon={<NoteIcon />} summary={notePreview(note)}>
+        <Textarea
+          id="note"
+          aria-label="Opomba"
+          rows={2}
+          ref={fitNoteHeight}
+          className="md:resize-none md:overflow-hidden"
+          value={note}
+          onChange={(e) => {
+            setNote(e.target.value);
+            fitNoteHeight(e.currentTarget);
+          }}
+        />
+      </Collapsible>
+      </div>
 
       {/* Povzetek projekta - enaka razdelitev kot na kartici projekta. */}
       <div className="grid grid-cols-3 gap-2 rounded-md border border-gray-200 border-l-4 border-l-blue-500 p-3 dark:border-gray-800 dark:border-l-blue-500">
@@ -1095,21 +1227,6 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
           )}
         </div>
       </div>
-
-      <Collapsible title="Opomba" summary={notePreview(note)}>
-        <Textarea
-          id="note"
-          aria-label="Opomba"
-          rows={2}
-          ref={fitNoteHeight}
-          className="md:resize-none md:overflow-hidden"
-          value={note}
-          onChange={(e) => {
-            setNote(e.target.value);
-            fitNoteHeight(e.currentTarget);
-          }}
-        />
-      </Collapsible>
 
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
