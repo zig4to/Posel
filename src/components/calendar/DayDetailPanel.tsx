@@ -406,7 +406,7 @@ export default function DayDetailPanel({
             onClick={() => setMode("add")}
             className="w-full"
           >
-            Dan projekta
+            Projekt
           </Button>
           <Button
             type="button"
