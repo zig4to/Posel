@@ -1,4 +1,5 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { isReadOnlyViewer, SHARE_VIEWER_NAME, shareViewerId } from "@/lib/sharing";
 import { createClient } from "@/lib/supabase/server";
 import { getClientById } from "@/lib/data/clients";
 import ClientForm from "@/components/clients/ClientForm";
@@ -11,6 +12,8 @@ export default async function UrediPartnerjaPage({
 }) {
   const { id } = await params;
   const supabase = await createClient();
+  if (await isReadOnlyViewer(supabase)) redirect(`/partnerji/${id}`);
+  const viewerId = shareViewerId();
 
   let client;
   try {
@@ -31,6 +34,8 @@ export default async function UrediPartnerjaPage({
           action={action}
           initialValues={client}
           submitLabel="Shrani spremembe"
+          shareWithName={viewerId ? SHARE_VIEWER_NAME : null}
+          initiallyShared={viewerId ? (client.shared_with ?? []).includes(viewerId) : false}
         />
       </div>
     </div>

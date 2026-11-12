@@ -2,7 +2,13 @@ import Link from "next/link";
 import type { Client } from "@/lib/types/database.types";
 import { ColorDot } from "@/components/ui/Badge";
 
-export default function ClientListItem({ client }: { client: Client }) {
+export default function ClientListItem({
+  client,
+  sharedLabel,
+}: {
+  client: Client;
+  sharedLabel?: string | null;
+}) {
   return (
     <Link
       href={`/partnerji/${client.id}`}
@@ -19,6 +25,28 @@ export default function ClientListItem({ client }: { client: Client }) {
           </p>
         )}
       </div>
+      {sharedLabel && (
+        <span
+          className="flex flex-shrink-0 items-center gap-1 text-xs text-blue-600 dark:text-blue-400"
+          title={sharedLabel}
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-3.5 w-3.5"
+            aria-hidden="true"
+          >
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+          </svg>
+          <span className="hidden sm:inline">{sharedLabel}</span>
+        </span>
+      )}
       <span className="flex-shrink-0 text-xs text-gray-400 dark:text-gray-500">→</span>
     </Link>
   );

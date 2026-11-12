@@ -62,7 +62,14 @@ function PanelRightOpenIcon() {
   );
 }
 
-export default function MonthCalendar({ clients }: { clients: Client[] }) {
+export default function MonthCalendar({
+  clients,
+  readOnly = false,
+}: {
+  clients: Client[];
+  /** Samo ogled deljenih strank - brez dodajanja in urejanja. */
+  readOnly?: boolean;
+}) {
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
@@ -263,6 +270,7 @@ export default function MonthCalendar({ clients }: { clients: Client[] }) {
           projects={projectsByDayAll.get(selectedDay.dateKey) ?? []}
           leaves={leavesForDay(selectedDay.dateKey)}
           clients={clients}
+          readOnly={readOnly}
           onClose={() => setSelectedDateKey(null)}
           onChanged={loadData}
         />

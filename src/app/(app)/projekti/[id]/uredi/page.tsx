@@ -1,4 +1,5 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { isReadOnlyViewer } from "@/lib/sharing";
 import { createClient } from "@/lib/supabase/server";
 import { getProjectById } from "@/lib/data/projects";
 import { getClients } from "@/lib/data/clients";
@@ -12,6 +13,7 @@ export default async function UrediProjektPage({
 }) {
   const { id } = await params;
   const supabase = await createClient();
+  if (await isReadOnlyViewer(supabase)) redirect("/projekti");
 
   let project;
   try {

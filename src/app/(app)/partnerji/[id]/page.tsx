@@ -5,6 +5,7 @@ import { getClientById } from "@/lib/data/clients";
 import { ColorDot } from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import DeleteClientButton from "@/components/clients/DeleteClientButton";
+import { isReadOnlyViewer, SHARE_VIEWER_NAME, shareViewerId } from "@/lib/sharing";
 
 const FIELDS: Array<{ key: "contact_person" | "phone" | "email" | "address"; label: string }> = [
   { key: "contact_person", label: "Kontaktna oseba" },
@@ -28,6 +29,10 @@ export default async function PartnerDetailPage({
     notFound();
   }
 
+  const readOnly = await isReadOnlyViewer(supabase);
+  const viewerId = shareViewerId();
+  const shared = !readOnly && viewerId != null && (client.shared_with ?? []).includes(viewerId);
+
   return (
     <div className="mx-auto max-w-lg">
       <div className="mb-4 flex items-start justify-between gap-3">
@@ -37,10 +42,18 @@ export default async function PartnerDetailPage({
             {client.company_name}
           </h1>
         </div>
-        <Link href={`/partnerji/${client.id}/uredi`} className="flex-shrink-0">
-          <Button variant="secondary">Uredi</Button>
-        </Link>
+        {!readOnly && (
+          <Link href={`/partnerji/${client.id}/uredi`} className="flex-shrink-0">
+            <Button variant="secondary">Uredi</Button>
+          </Link>
+        )}
       </div>
+
+      {shared && (
+        <p className="mb-3 text-sm text-blue-600 dark:text-blue-400">
+          Deljeno z {SHARE_VIEWER_NAME} (samo ogled)
+        </p>
+      )}
 
       <div className="rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
         <dl className="space-y-3">
@@ -62,7 +75,7 @@ export default async function PartnerDetailPage({
         >
           ← Nazaj na seznam
         </Link>
-        <DeleteClientButton clientId={client.id} />
+        {!readOnly && <DeleteClientButton clientId={client.id} />}
       </div>
     </div>
   );

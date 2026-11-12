@@ -31,6 +31,8 @@ export type Database = {
           email: string | null;
           address: string | null;
           color: string;
+          /** Uporabniki, ki stranko (in njene projekte) vidijo - samo ogled. */
+          shared_with: string[];
           created_at: string;
           updated_at: string;
         };
@@ -43,6 +45,7 @@ export type Database = {
           email?: string | null;
           address?: string | null;
           color: string;
+          shared_with?: string[];
           created_at?: string;
           updated_at?: string;
         };
@@ -55,6 +58,7 @@ export type Database = {
           email?: string | null;
           address?: string | null;
           color?: string;
+          shared_with?: string[];
           created_at?: string;
           updated_at?: string;
         };

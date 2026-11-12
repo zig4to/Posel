@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+import { isReadOnlyViewer } from "@/lib/sharing";
 import { createClient } from "@/lib/supabase/server";
 import { getClients } from "@/lib/data/clients";
 import ProjectForm from "@/components/projects/ProjectForm";
@@ -5,6 +7,7 @@ import { getCurrentDieselPrice } from "@/lib/fuel";
 
 export default async function NovProjektPage() {
   const supabase = await createClient();
+  if (await isReadOnlyViewer(supabase)) redirect("/projekti");
   const [clients, dieselPrice] = await Promise.all([
     getClients(supabase),
     getCurrentDieselPrice(),
