@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { sessionCookieOptions } from "./cookie-options";
 
 const PUBLIC_PATHS = ["/login"];
 
@@ -10,6 +11,9 @@ export async function updateSession(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      cookieOptions: sessionCookieOptions(
+        request.nextUrl.protocol === "https:" || request.headers.get("x-forwarded-proto") === "https"
+      ),
       cookies: {
         getAll() {
           return request.cookies.getAll();

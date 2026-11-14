@@ -9,6 +9,21 @@ const nextConfig: NextConfig = {
   // Skrij Next.js značko/indikator v spodnjem levem kotu med razvojem.
   // Napake pri prevajanju/izvajanju se še vedno prikažejo.
   devIndicators: false,
+
+  // Piškotki s sejo so SameSite=None (src/lib/supabase/cookie-options.ts), da
+  // prijava deluje v predogledu Klodija. Zato aplikacijo v okvir (iframe) sme
+  // vstaviti le ona sama in Klodi — sicer bi jo lahko tuja stran prekrila
+  // (clickjacking). Samo produkcija: dev strežnike vstavljata Klodi (tunel) in
+  // Live Claude v zaganjalniku.
+  async headers() {
+    if (process.env.NODE_ENV !== "production") return [];
+    return [
+      {
+        source: "/:path*",
+        headers: [{ key: "Content-Security-Policy", value: "frame-ancestors 'self' https://klodi-ruby.vercel.app" }],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
