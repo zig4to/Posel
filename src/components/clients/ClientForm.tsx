@@ -1,9 +1,11 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import type { Client } from "@/lib/types/database.types";
 import type { ClientFormState } from "@/actions/clients";
-import { Field, Input } from "@/components/ui/Input";
+import { Field, Input, Label } from "@/components/ui/Input";
+import { CLIENT_COLOR_CHOICES } from "@/lib/utils/color";
+import clsx from "@/lib/utils/clsx";
 import Button from "@/components/ui/Button";
 
 type ClientFormProps = {
@@ -20,6 +22,69 @@ type ClientFormProps = {
 };
 
 const initialState: ClientFormState = {};
+
+/**
+ * Izbira barve partnerja: gumb s trenutno barvo odpre nabor barv.
+ * Brez izbire (nov partner) se barva dodeli samodejno.
+ */
+function ColorPicker({ initialColor }: { initialColor: string | null }) {
+  const [color, setColor] = useState(initialColor);
+  const [open, setOpen] = useState(false);
+  const choices: string[] = [...CLIENT_COLOR_CHOICES];
+  // Obstoječa barva, ki ni v naboru, ostane na voljo.
+  if (initialColor && !choices.some((c) => c.toUpperCase() === initialColor.toUpperCase())) {
+    choices.unshift(initialColor);
+  }
+
+  return (
+    <div>
+      <Label>Barva</Label>
+      <input type="hidden" name="color" value={color ?? ""} />
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+      >
+        <span
+          className="h-4 w-4 rounded-full border border-black/10 dark:border-white/20"
+          style={{
+            background: color ?? "repeating-linear-gradient(45deg,#D1D5DB 0 3px,transparent 3px 6px)",
+          }}
+          aria-hidden="true"
+        />
+        {color ? "Spremeni barvo" : "Samodejno – izberi barvo"}
+      </button>
+      {open && (
+        <div className="mt-2 flex flex-wrap gap-2" role="radiogroup" aria-label="Barva partnerja">
+          {choices.map((c) => {
+            const selected = color?.toUpperCase() === c.toUpperCase();
+            return (
+              <button
+                key={c}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                aria-label={c}
+                title={c}
+                onClick={() => {
+                  setColor(c);
+                  setOpen(false);
+                }}
+                className={clsx(
+                  "h-8 w-8 rounded-full border border-black/10 transition-transform hover:scale-110 dark:border-white/20",
+                  selected &&
+                    "ring-2 ring-gray-900 ring-offset-2 ring-offset-white dark:ring-gray-100 dark:ring-offset-gray-900"
+                )}
+                style={{ backgroundColor: c }}
+              />
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function ClientForm({
   action,
@@ -72,6 +137,7 @@ export default function ClientForm({
           defaultValue={initialValues?.address ?? ""}
         />
       </Field>
+      <ColorPicker initialColor={initialValues?.color ?? null} />
       {shareWithName && (
         <div>
           {/* Oznaka, da je polje v obrazcu (neoznačen checkbox se ne pošlje). */}

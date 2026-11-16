@@ -31,3 +31,18 @@ export const LEAVE_COLOR_PALETTE = [
   "#F59E0B", // jantarna
   "#64748B", // skrilavec
 ] as const;
+
+// Barve, ki jih lahko uporabnik ročno izbere za stranko (paleta + nekaj dodatnih).
+export const CLIENT_COLOR_CHOICES = [
+  ...CLIENT_COLOR_PALETTE,
+  "#0EA5E9", // nebo modra
+  "#D946EF", // fuksija
+  "#A16207", // rjava
+  "#64748B", // skrilavec
+] as const;
+
+const HEX_COLOR_RE = /^#[0-9A-Fa-f]{6}$/;
+
+export function isHexColor(value: string): boolean {
+  return HEX_COLOR_RE.test(value);
+}

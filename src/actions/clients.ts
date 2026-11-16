@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getClientCount } from "@/lib/data/clients";
-import { nextClientColor } from "@/lib/utils/color";
+import { isHexColor, nextClientColor } from "@/lib/utils/color";
 import { isReadOnlyViewer, shareViewerId } from "@/lib/sharing";
 
 const READ_ONLY_ERROR = "Imaš samo pravico ogleda.";
@@ -19,6 +19,9 @@ function readClientFields(formData: FormData) {
   const phone = String(formData.get("phone") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim();
   const address = String(formData.get("address") ?? "").trim();
+  const colorValue = String(formData.get("color") ?? "").trim();
+  // Barva samo, če je veljavna (#RRGGBB); sicer ostane obstoječa / samodejna.
+  const color = isHexColor(colorValue) ? { color: colorValue.toUpperCase() } : {};
 
   // Polje "Deli z …" je v obrazcu le, če je gledalec nastavljen.
   const viewerId = shareViewerId();
@@ -33,6 +36,7 @@ function readClientFields(formData: FormData) {
     phone: phone || null,
     email: email || null,
     address: address || null,
+    ...color,
     ...sharing,
   };
 }
@@ -49,8 +53,8 @@ export async function createClientAction(
 
   const supabase = await createClient();
   if (await isReadOnlyViewer(supabase)) return { error: READ_ONLY_ERROR };
-  const existingCount = await getClientCount(supabase);
-  const color = nextClientColor(existingCount);
+  // Brez ročno izbrane barve dodelimo naslednjo iz palete.
+  const color = fields.color ?? nextClientColor(await getClientCount(supabase));
 
   const { error } = await supabase.from("clients").insert({
     ...fields,
