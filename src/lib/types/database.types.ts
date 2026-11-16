@@ -314,7 +314,7 @@ export type ProjectUpdate =
   Database["public"]["Tables"]["projects"]["Update"];
 
 export type ProjectWithClient = Project & {
-  clients: Pick<Client, "id" | "company_name" | "color"> | null;
+  clients: Pick<Client, "id" | "company_name" | "color" | "address"> | null;
 };
 
 // "CalendarEvent" namesto "Event", da se ne prekriva z DOM globalom Event.

@@ -11,6 +11,7 @@ import type {
 } from "@/lib/types/database.types";
 import {
   createProjectAction,
+  saveProjectItemsAction,
   updateProjectAction,
   type ProjectInput,
 } from "@/actions/projects";
@@ -18,7 +19,6 @@ import { Field, Input, Textarea } from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import Collapsible from "@/components/ui/Collapsible";
 import {
-  CalendarIcon,
   ClockIcon,
   EuroIcon,
   FuelIcon,
@@ -88,6 +88,26 @@ const NO_DAYS_HINT = (
     Najprej izberi dneve projekta.
   </p>
 );
+
+function AutoSaveHint({
+  state,
+  field,
+}: {
+  state: { field: string; message: string; error?: boolean } | null;
+  field: string;
+}) {
+  if (!state || state.field !== field) return null;
+  return (
+    <p
+      className={clsx(
+        "text-xs",
+        state.error ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"
+      )}
+    >
+      {state.message}
+    </p>
+  );
+}
 
 function initialItems(items: CostItem[] | undefined): ItemFields[] {
   if (items && items.length > 0) {
@@ -239,6 +259,22 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
   const [note, setNote] = useState(project?.note ?? "");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  // Stanje sprotnega shranjevanja postavk ob kliku na "+" (samo pri urejanju).
+  const [itemsSaved, setItemsSaved] = useState<{
+    field: "extra_items" | "cost_items";
+    message: string;
+    error?: boolean;
+  } | null>(null);
+
+  async function autoSaveItems(field: "extra_items" | "cost_items", items: ItemFields[]) {
+    if (!project) return;
+    const result = await saveProjectItemsAction(project.id, field, toCostItems(items));
+    setItemsSaved(
+      result.error
+        ? { field, message: result.error, error: true }
+        : { field, message: "Shranjeno" }
+    );
+  }
 
   const selectedClientColor =
     clients.find((c) => c.id === clientId)?.color ?? "#3B82F6";
@@ -624,6 +660,29 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
             onAddRange={addRange}
             color={selectedClientColor}
             dayColors={dayColors}
+            actions={
+              selectedMonths.length > 0 && (
+                // Enako velik kot gumb "Razpon"; priliv in stroški se v
+                // pregledu financ štejejo v izbrani mesec.
+                <select
+                  id="billing_month"
+                  aria-label="Mesec obračuna"
+                  title="Mesec obračuna: priliv in stroški projekta se v pregledu financ štejejo v ta mesec."
+                  value={billingMonth}
+                  onChange={(e) => setBillingMonth(e.target.value)}
+                  className="h-[22px] cursor-pointer rounded-md border border-gray-300 bg-white px-2 py-0 text-xs font-medium text-gray-700 hover:bg-gray-50 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 dark:[color-scheme:dark]"
+                >
+                  <option value="">
+                    Obračun: {formatMonthKey(autoBillingMonth(sortedSelectedDates))}
+                  </option>
+                  {billingMonthOptions.map((key) => (
+                    <option key={key} value={key}>
+                      Obračun: {formatMonthKey(key)}
+                    </option>
+                  ))}
+                </select>
+              )
+            }
           />
 
           {/* Izbrani dnevi po mesecih - klik skoči na mesec. */}
@@ -647,36 +706,6 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
             </div>
           )}
 
-          {selectedMonths.length > 0 && (
-            <Collapsible
-              nested
-              title="Mesec obračuna"
-              icon={<CalendarIcon />}
-              summary={formatMonthKey(billingMonth || autoBillingMonth(sortedSelectedDates))}
-            >
-              <div>
-                <select
-                  id="billing_month"
-                  aria-label="Mesec obračuna"
-                  value={billingMonth}
-                  onChange={(e) => setBillingMonth(e.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:[color-scheme:dark] sm:w-64"
-                >
-                  <option value="">
-                    Samodejno – {formatMonthKey(autoBillingMonth(sortedSelectedDates))}
-                  </option>
-                  {billingMonthOptions.map((key) => (
-                    <option key={key} value={key}>
-                      {formatMonthKey(key)}
-                    </option>
-                  ))}
-                </select>
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  Priliv in stroški projekta se v pregledu financ štejejo v ta mesec.
-                </p>
-              </div>
-            </Collapsible>
-          )}
         </div>
       </div>
 
@@ -834,7 +863,7 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
       </Collapsible>
 
       {/* Obračun: na uro (ure × cena na uro) ali na projekt (ročen priliv). */}
-      <Collapsible title="Obračun" icon={<EuroIcon />} summary={formatEUR(baseRevenue)} defaultOpen>
+      <Collapsible title="Obračun" icon={<EuroIcon />} summary={formatEUR(baseRevenue)}>
         <div
           role="radiogroup"
           aria-label="Način obračuna"
@@ -1166,7 +1195,9 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
             onChange={setCostItems}
             idPrefix="cost"
             itemLabel="stroška"
+            onAdd={project ? (items) => autoSaveItems("cost_items", items) : undefined}
           />
+          <AutoSaveHint state={itemsSaved} field="cost_items" />
         </Collapsible>
       </Collapsible>
 
@@ -1182,7 +1213,9 @@ export default function ProjectForm({ clients, project, dieselPrice }: ProjectFo
           idPrefix="extra"
           itemLabel="storitve"
           notePlaceholder="Opis storitve"
+          onAdd={project ? (items) => autoSaveItems("extra_items", items) : undefined}
         />
+        <AutoSaveHint state={itemsSaved} field="extra_items" />
       </Collapsible>
 
       <Collapsible title="Opomba" icon={<NoteIcon />} summary={notePreview(note)}>

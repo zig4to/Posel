@@ -6,6 +6,7 @@ import type { ProjectWithClient } from "@/lib/types/database.types";
 import { ColorDot } from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import DeleteProjectButton from "@/components/projects/DeleteProjectButton";
+import InvoiceButton from "@/components/projects/InvoiceButton";
 import { formatEUR } from "@/lib/utils/currency";
 import {
   formatHours,
@@ -168,6 +169,7 @@ export default function ProjectCard({
                 </Button>
               </Link>
               <DeleteProjectButton projectId={project.id} className={CARD_BUTTON_CLASS} />
+              <InvoiceButton project={project} className={CARD_BUTTON_CLASS} />
             </>
           )}
           {(hasNotes || hasExtra) && (

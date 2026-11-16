@@ -14,7 +14,7 @@ export async function getProjects(
 ): Promise<ProjectWithClient[]> {
   const { data, error } = await supabase
     .from("projects")
-    .select("*, clients(id, company_name, color)");
+    .select("*, clients(id, company_name, color, address)");
 
   if (error) throw error;
 
@@ -33,7 +33,7 @@ export async function getProjectsInRange(
 ): Promise<ProjectWithClient[]> {
   const { data, error } = await supabase
     .from("projects")
-    .select("*, clients(id, company_name, color)")
+    .select("*, clients(id, company_name, color, address)")
     .overlaps("work_dates", eachDateInRange(from, to))
     .order("created_at", { ascending: true });
 
@@ -47,7 +47,7 @@ export async function getProjectById(
 ): Promise<ProjectWithClient> {
   const { data, error } = await supabase
     .from("projects")
-    .select("*, clients(id, company_name, color)")
+    .select("*, clients(id, company_name, color, address)")
     .eq("id", id)
     .single();
 

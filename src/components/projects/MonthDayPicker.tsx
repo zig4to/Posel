@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import Button from "@/components/ui/Button";
 import {
   formatDateKey,
@@ -19,6 +19,8 @@ type MonthDayPickerProps = {
   color: string;
   /** dateKey -> barve strank drugih projektov tega dne (isto kot na zavihku Koledar). */
   dayColors: Map<string, string[]>;
+  /** Dodatni elementi desno od gumba "Razpon" (npr. izbira meseca obračuna). */
+  actions?: ReactNode;
 };
 
 export default function MonthDayPicker({
@@ -29,6 +31,7 @@ export default function MonthDayPicker({
   onAddRange,
   color,
   dayColors,
+  actions,
 }: MonthDayPickerProps) {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
@@ -160,7 +163,7 @@ export default function MonthDayPicker({
           </Button>
         </div>
       ) : (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {/* Nizek gumb (manj navpičnega odmika), da ne zavzame preveč prostora. */}
           <Button
             type="button"
@@ -170,6 +173,7 @@ export default function MonthDayPicker({
           >
             Razpon
           </Button>
+          {actions}
         </div>
       )}
     </div>
