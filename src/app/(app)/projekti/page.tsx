@@ -90,6 +90,28 @@ export default async function ProjektiPage() {
             />
           )}
           {!readOnly && <TaxObligationsButton />}
+          {projects.length > 0 && (
+            <Link href="/projekti/statistika" aria-label="Statistika" title="Statistika">
+              <Button type="button" variant="secondary" className="h-8">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-4 w-4"
+                  aria-hidden="true"
+                >
+                  <path d="M3 3v16a2 2 0 0 0 2 2h16" />
+                  <path d="M18 17V9" />
+                  <path d="M13 17V5" />
+                  <path d="M8 17v-3" />
+                </svg>
+                <span className="hidden sm:inline">Statistika</span>
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
 
