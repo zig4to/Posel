@@ -19,6 +19,7 @@ import {
 import Button from "@/components/ui/Button";
 import MonthYearPicker from "./MonthYearPicker";
 import FilterMenu from "./FilterMenu";
+import QuickHoursMenu from "./QuickHoursMenu";
 import CalendarDayCell, { type DayClientSummary } from "./CalendarDayCell";
 import DayDetailPanel from "./DayDetailPanel";
 
@@ -204,6 +205,7 @@ export default function MonthCalendar({
             na desktopu (sm+) ovoj izgine (display:contents) in gumba se
             obnašata kot prej v skupni vrstici. */}
         <div className="ml-auto flex flex-shrink-0 items-center gap-1.5 sm:ml-0 sm:contents">
+          {!readOnly && <QuickHoursMenu onSaved={loadData} />}
           <FilterMenu
             clients={clients}
             selectedClientId={filterClientId}

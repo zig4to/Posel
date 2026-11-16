@@ -355,6 +355,48 @@ export async function removeProjectDayAction(
   return {};
 }
 
+/**
+ * Hiter vpis ur: projektu nastavi ure za dan (če dneva še nima, ga doda).
+ * 0 ur odstrani vpis ur za ta dan. Pri urnem obračunu preračuna priliv.
+ */
+export async function setProjectDayHoursAction(
+  id: string,
+  date: string,
+  hours: number
+): Promise<ProjectActionResult> {
+  if (!DATE_RE.test(date)) return { error: "Neveljaven datum." };
+  if (!(hours >= 0 && hours <= 24)) return { error: "Ure morajo biti med 0 in 24." };
+
+  const supabase = await createClient();
+  const { data: project, error: readError } = await supabase
+    .from("projects")
+    .select(DAY_FIELDS)
+    .eq("id", id)
+    .single();
+  if (readError) {
+    return { error: "Napaka pri branju projekta: " + readError.message };
+  }
+
+  const day_hours: DayHours = { ...(project.day_hours ?? {}) };
+  if (hours > 0) day_hours[date] = Math.round(hours * 100) / 100;
+  else delete day_hours[date];
+
+  const revenue = hourlyRevenue(project, day_hours);
+  const { error } = await supabase
+    .from("projects")
+    .update({
+      work_dates: normalizeDates([...project.work_dates, date]),
+      day_hours,
+      ...(revenue === null ? {} : { revenue }),
+    })
+    .eq("id", id);
+  if (error) return { error: "Napaka pri vpisu ur: " + error.message };
+
+  revalidatePath("/");
+  revalidatePath("/projekti");
+  return {};
+}
+
 export type AddProjectDaysInput = {
   /** Obstoječ projekt; null = nov projekt. */
   project_id: string | null;
