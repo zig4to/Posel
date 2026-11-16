@@ -14,6 +14,11 @@ type FilterMenuProps = {
   year: number;
   month: number; // 0-11
   onDateChange: (year: number, month: number) => void;
+  /**
+   * Mobilna različica pod koledarjem: gumb z napisom, meni se odpre navzgor
+   * (poravnan na levi rob zaslona), da ne zleze pod spodnji rob.
+   */
+  mobileBelow?: boolean;
 };
 
 type Section = "partnerji" | "datum";
@@ -83,6 +88,7 @@ export default function FilterMenu({
   year,
   month,
   onDateChange,
+  mobileBelow = false,
 }: FilterMenuProps) {
   const [open, setOpen] = useState(false);
   const [section, setSection] = useState<Section>("partnerji");
@@ -118,11 +124,18 @@ export default function FilterMenu({
         return;
       }
       const rect = rootRef.current.getBoundingClientRect();
-      setMobilePanelStyle({
-        position: "fixed",
-        top: rect.bottom + 8,
-        right: 12,
-      });
+      setMobilePanelStyle(
+        mobileBelow
+          ? {
+              position: "fixed",
+              bottom: window.innerHeight - rect.top + 8,
+              left: 12,
+              marginTop: 0,
+              maxHeight: Math.max(200, rect.top - 20),
+              overflowY: "auto",
+            }
+          : { position: "fixed", top: rect.bottom + 8, right: 12 }
+      );
     };
     reposition();
     window.addEventListener("resize", reposition);
@@ -133,7 +146,7 @@ export default function FilterMenu({
       window.removeEventListener("scroll", reposition, true);
       mq.removeEventListener("change", reposition);
     };
-  }, [open]);
+  }, [open, mobileBelow]);
 
   function toggleOpen() {
     setOpen((v) => {
@@ -233,7 +246,8 @@ export default function FilterMenu({
         type="button"
         onClick={toggleOpen}
         className={clsx(
-          "inline-flex max-w-full flex-shrink-0 items-center gap-1.5 rounded-md border px-2 py-2 text-sm font-medium max-sm:w-11 max-sm:justify-center sm:gap-2 sm:px-3",
+          "inline-flex max-w-full flex-shrink-0 items-center gap-1.5 rounded-md border px-2 py-2 text-sm font-medium sm:gap-2 sm:px-3",
+          mobileBelow ? "px-3" : "max-sm:w-9 max-sm:justify-center max-sm:px-0",
           selectedClient
             ? "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300"
             : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
@@ -243,13 +257,18 @@ export default function FilterMenu({
         {selectedClient && (
           <ColorDot
             color={selectedClient.color}
-            className="hidden sm:inline-block"
+            className={mobileBelow ? "inline-block" : "hidden sm:inline-block"}
           />
         )}
-        <span className="hidden min-w-0 truncate sm:inline">
+        <span className={clsx("min-w-0 truncate", mobileBelow ? "inline" : "hidden sm:inline")}>
           Filter{selectedClient ? `: ${selectedClient.company_name}` : ""}
         </span>
-        <span className="hidden text-xs text-gray-400 dark:text-gray-500 sm:inline">
+        <span
+          className={clsx(
+            "text-xs text-gray-400 dark:text-gray-500",
+            mobileBelow ? "inline" : "hidden sm:inline"
+          )}
+        >
           ▾
         </span>
       </button>

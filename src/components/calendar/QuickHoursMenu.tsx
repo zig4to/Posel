@@ -158,7 +158,7 @@ export default function QuickHoursMenu({ onSaved }: { onSaved: () => void }) {
         onClick={toggleOpen}
         aria-label="Vpiši ure"
         title="Vpiši ure za danes"
-        className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-md border border-gray-300 bg-white px-2 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 max-sm:w-11 max-sm:justify-center dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 sm:gap-2 sm:px-3"
+        className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-md border border-gray-300 bg-white px-2 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 max-sm:w-9 max-sm:justify-center max-sm:px-0 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 sm:gap-2 sm:px-3"
       >
         <ClockPlusIcon />
         <span className="hidden sm:inline">Vpiši ure</span>

@@ -69,12 +69,12 @@ export default async function ProjektiPage() {
 
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Vsi projekti</h1>
-        <div className="flex items-center gap-2">
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <h1 className="min-w-0 truncate text-lg font-semibold text-gray-900 dark:text-gray-100 sm:text-xl">Vsi projekti</h1>
+        <div className="flex flex-shrink-0 items-center gap-1.5 sm:gap-2">
           {!readOnly && clients.length > 0 && (
             <Link href="/projekti/nov">
-              <Button className="h-8">+ Dodaj projekt</Button>
+              <Button className="h-8 whitespace-nowrap px-2.5 text-xs sm:px-3 sm:text-sm">+ Dodaj projekt</Button>
             </Link>
           )}
           {clients.length > 0 && (

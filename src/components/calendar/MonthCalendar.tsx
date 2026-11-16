@@ -206,24 +206,27 @@ export default function MonthCalendar({
             obnašata kot prej v skupni vrstici. */}
         <div className="ml-auto flex flex-shrink-0 items-center gap-1.5 sm:ml-0 sm:contents">
           {!readOnly && <QuickHoursMenu onSaved={loadData} />}
-          <FilterMenu
-            clients={clients}
-            selectedClientId={filterClientId}
-            onClientChange={setFilterClientId}
-            year={year}
-            month={month}
-            onDateChange={(y, m) => {
-              setYear(y);
-              setMonth(m);
-            }}
-          />
+          {/* Na telefonu je Filter pod koledarjem (glej spodaj). */}
+          <div className="hidden sm:contents">
+            <FilterMenu
+              clients={clients}
+              selectedClientId={filterClientId}
+              onClientChange={setFilterClientId}
+              year={year}
+              month={month}
+              onDateChange={(y, m) => {
+                setYear(y);
+                setMonth(m);
+              }}
+            />
+          </div>
           <Button
             type="button"
             variant="secondary"
             onClick={() => setShowWeekends((v) => !v)}
             aria-label={showWeekends ? "Skrij vikende" : "Pokaži vikende"}
             title={showWeekends ? "Skrij vikende" : "Pokaži vikende"}
-            className="flex-shrink-0 max-sm:w-11 max-sm:justify-center"
+            className="flex-shrink-0 max-sm:w-9 max-sm:justify-center max-sm:px-0"
           >
             {showWeekends ? <PanelRightOpenIcon /> : <PanelRightCloseIcon />}
             <span className="hidden sm:inline">
@@ -262,6 +265,22 @@ export default function MonthCalendar({
             large={!showWeekends}
           />
         ))}
+      </div>
+
+      {/* Telefon: Filter pod koledarjem (meni se odpre navzgor). */}
+      <div className="mt-3 sm:hidden">
+        <FilterMenu
+          mobileBelow
+          clients={clients}
+          selectedClientId={filterClientId}
+          onClientChange={setFilterClientId}
+          year={year}
+          month={month}
+          onDateChange={(y, m) => {
+            setYear(y);
+            setMonth(m);
+          }}
+        />
       </div>
 
       {selectedDay && (
