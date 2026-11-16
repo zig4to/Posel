@@ -6,6 +6,7 @@ import type { ProjectWithClient } from "@/lib/types/database.types";
 import { ColorDot } from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import DeleteProjectButton from "@/components/projects/DeleteProjectButton";
+import InvoiceButton from "@/components/projects/InvoiceButton";
 import { formatEUR } from "@/lib/utils/currency";
 import {
   formatHours,
@@ -45,7 +46,14 @@ function formatDaysLabel(project: ProjectWithClient): string {
     .join(" · ");
 }
 
-export default function ProjectCard({ project }: { project: ProjectWithClient }) {
+export default function ProjectCard({
+  project,
+  readOnly = false,
+}: {
+  project: ProjectWithClient;
+  /** Samo ogled (deljen projekt) - brez gumbov Uredi/Izbriši. */
+  readOnly?: boolean;
+}) {
   const [showNotes, setShowNotes] = useState(false);
   const costItems = project.cost_items ?? [];
   const costs = projectTotalCosts(project);
@@ -153,12 +161,17 @@ export default function ProjectCard({ project }: { project: ProjectWithClient })
         </div>
 
         <div className="mt-3 flex flex-wrap gap-2 md:ml-auto md:mt-0 md:w-32 md:flex-shrink-0 md:flex-col md:gap-1">
-          <Link href={`/projekti/${project.id}/uredi`} className="md:block">
-            <Button type="button" variant="secondary" className={CARD_BUTTON_CLASS}>
-              Uredi
-            </Button>
-          </Link>
-          <DeleteProjectButton projectId={project.id} className={CARD_BUTTON_CLASS} />
+          {!readOnly && (
+            <>
+              <Link href={`/projekti/${project.id}/uredi`} className="md:block">
+                <Button type="button" variant="secondary" className={CARD_BUTTON_CLASS}>
+                  Uredi
+                </Button>
+              </Link>
+              <DeleteProjectButton projectId={project.id} className={CARD_BUTTON_CLASS} />
+              <InvoiceButton project={project} className={CARD_BUTTON_CLASS} />
+            </>
+          )}
           {(hasNotes || hasExtra) && (
             // Brez opomb je gumb viden samo na računalniku (za gorivo/ure).
             <span className={hasNotes ? "contents" : "hidden md:contents"}>

@@ -34,6 +34,8 @@ type DayDetailPanelProps = {
   projects: ProjectWithClient[];
   leaves: Leave[];
   clients: Client[];
+  /** Samo ogled - brez gumbov za dodajanje, urejanje in prestavljanje. */
+  readOnly?: boolean;
   onClose: () => void;
   onChanged: () => void; // pokliči po vsaki spremembi, da se osveži mesečni prikaz
 };
@@ -80,6 +82,7 @@ export default function DayDetailPanel({
   projects,
   leaves,
   clients,
+  readOnly = false,
   onClose,
   onChanged,
 }: DayDetailPanelProps) {
@@ -188,18 +191,20 @@ export default function DayDetailPanel({
                         {event.note ? ` · ${event.note}` : ""}
                       </p>
                     </div>
-                    <button
-                      type="button"
-                      aria-label="Uredi dogodek"
-                      title="Uredi"
-                      className={EDIT_BUTTON_CLASS}
-                      onClick={() => {
-                        setEditingEvent(event);
-                        setMode("edit-event");
-                      }}
-                    >
-                      <EditIcon className="h-4 w-4" />
-                    </button>
+                    {!readOnly && (
+                      <button
+                        type="button"
+                        aria-label="Uredi dogodek"
+                        title="Uredi"
+                        className={EDIT_BUTTON_CLASS}
+                        onClick={() => {
+                          setEditingEvent(event);
+                          setMode("edit-event");
+                        }}
+                      >
+                        <EditIcon className="h-4 w-4" />
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -249,6 +254,8 @@ export default function DayDetailPanel({
                             </p>
                           )}
                         </div>
+                        {!readOnly && (
+                        <>
                         <button
                           type="button"
                           aria-label="Prestavi ali odstrani dan projekta"
@@ -274,8 +281,10 @@ export default function DayDetailPanel({
                         >
                           <EditIcon className="h-4 w-4" />
                         </Link>
+                        </>
+                        )}
                       </div>
-                      {movingProjectId === project.id && (
+                      {!readOnly && movingProjectId === project.id && (
                         <div className="mt-2 space-y-2 border-t border-gray-100 pt-2 dark:border-gray-800">
                           <label
                             htmlFor={`move-${project.id}`}
@@ -353,6 +362,7 @@ export default function DayDetailPanel({
                         {formatShortDate(leave.end_date)}
                       </p>
                     </div>
+                    {!readOnly && (
                     <div className="flex flex-shrink-0 gap-1">
                       <Button
                         type="button"
@@ -373,19 +383,22 @@ export default function DayDetailPanel({
                         Izbriši
                       </Button>
                     </div>
+                    )}
                   </li>
                 ))}
               </ul>
             </section>
           )}
 
-          <Button
-            type="button"
-            onClick={() => setMode("choose")}
-            className="w-full"
-          >
-            + Dodaj
-          </Button>
+          {!readOnly && (
+            <Button
+              type="button"
+              onClick={() => setMode("choose")}
+              className="w-full"
+            >
+              + Dodaj
+            </Button>
+          )}
         </div>
       )}
 

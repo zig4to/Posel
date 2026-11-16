@@ -13,6 +13,10 @@ type ClientFormProps = {
   ) => Promise<ClientFormState>;
   initialValues?: Partial<Client>;
   submitLabel: string;
+  /** Ime osebe za "Deli z …"; brez njega polja ni. */
+  shareWithName?: string | null;
+  /** Ali je stranka trenutno deljena. */
+  initiallyShared?: boolean;
 };
 
 const initialState: ClientFormState = {};
@@ -21,6 +25,8 @@ export default function ClientForm({
   action,
   initialValues,
   submitLabel,
+  shareWithName,
+  initiallyShared = false,
 }: ClientFormProps) {
   const [state, formAction, pending] = useActionState(action, initialState);
 
@@ -66,6 +72,29 @@ export default function ClientForm({
           defaultValue={initialValues?.address ?? ""}
         />
       </Field>
+      {shareWithName && (
+        <div>
+          {/* Oznaka, da je polje v obrazcu (neoznačen checkbox se ne pošlje). */}
+          <input type="hidden" name="share_field" value="1" />
+          <label className="flex cursor-pointer items-start gap-2">
+            <input
+              type="checkbox"
+              name="shared"
+              defaultChecked={initiallyShared}
+              className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800"
+            />
+            <span>
+              <span className="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                Deli z {shareWithName}
+              </span>
+              <span className="block text-xs text-gray-500 dark:text-gray-400">
+                {shareWithName} bo videl tega partnerja in vse njegove projekte (ure,
+                stroške, priliv) – samo ogled, brez urejanja.
+              </span>
+            </span>
+          </label>
+        </div>
+      )}
       {state.error && (
         <p className="text-sm text-red-600 dark:text-red-400">{state.error}</p>
       )}

@@ -38,7 +38,7 @@ in komentarji so v **slovenščini**. Commit sporočila v slovenščini.
 
 - `src/proxy.ts` → `updateSession` (middleware): nepridjavljene preusmeri na
   `/login`; `/login` je edina javna pot (`PUBLIC_PATHS`).
-- Prijava iz huba (TomsStudios): naslov lahko nosi fragment
+- Prijava iz huba (Bitneverse): naslov lahko nosi fragment
   `#sb_at=…&sb_rt=…`; `SSO_PREPAINT_SCRIPT` (`src/lib/sso.ts`) postavi
   `data-sso="pending"` še pred izrisom, `/login` medtem pokaže nalagalnik.
 

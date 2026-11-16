@@ -5,6 +5,9 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getClientCount } from "@/lib/data/clients";
 import { nextClientColor } from "@/lib/utils/color";
+import { isReadOnlyViewer, shareViewerId } from "@/lib/sharing";
+
+const READ_ONLY_ERROR = "Imaš samo pravico ogleda.";
 
 export type ClientFormState = {
   error?: string;
@@ -17,12 +20,20 @@ function readClientFields(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
   const address = String(formData.get("address") ?? "").trim();
 
+  // Polje "Deli z …" je v obrazcu le, če je gledalec nastavljen.
+  const viewerId = shareViewerId();
+  const sharing =
+    viewerId && formData.has("share_field")
+      ? { shared_with: formData.get("shared") === "on" ? [viewerId] : [] }
+      : {};
+
   return {
     company_name: companyName,
     contact_person: contactPerson || null,
     phone: phone || null,
     email: email || null,
     address: address || null,
+    ...sharing,
   };
 }
 
@@ -37,6 +48,7 @@ export async function createClientAction(
   }
 
   const supabase = await createClient();
+  if (await isReadOnlyViewer(supabase)) return { error: READ_ONLY_ERROR };
   const existingCount = await getClientCount(supabase);
   const color = nextClientColor(existingCount);
 
@@ -66,6 +78,7 @@ export async function updateClientAction(
   }
 
   const supabase = await createClient();
+  if (await isReadOnlyViewer(supabase)) return { error: READ_ONLY_ERROR };
   const { error } = await supabase
     .from("clients")
     .update(fields)
@@ -83,6 +96,7 @@ export async function updateClientAction(
 
 export async function deleteClientAction(id: string) {
   const supabase = await createClient();
+  if (await isReadOnlyViewer(supabase)) throw new Error(READ_ONLY_ERROR);
   const { error } = await supabase.from("clients").delete().eq("id", id);
 
   if (error) {

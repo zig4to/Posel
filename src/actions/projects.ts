@@ -214,6 +214,47 @@ export async function updateProjectAction(
   redirect("/projekti");
 }
 
+/**
+ * Sprotno shrani samo postavke (dodatne storitve ali ostale stroški) obstoječega
+ * projekta - ob kliku na "+" v obrazcu, brez ostalih (morda nedokončanih)
+ * sprememb. Pri dodatnih storitvah se priliv prilagodi: osnova + nove storitve.
+ */
+export async function saveProjectItemsAction(
+  id: string,
+  field: "extra_items" | "cost_items",
+  items: CostItem[]
+): Promise<ProjectActionResult> {
+  if (items.some((item) => !(item.amount >= 0))) {
+    return { error: "Znesek ne sme biti negativen." };
+  }
+  const cleaned = cleanCostItems(items);
+
+  const supabase = await createClient();
+  if (field === "cost_items") {
+    const { error } = await supabase.from("projects").update({ cost_items: cleaned }).eq("id", id);
+    if (error) return { error: "Napaka pri shranjevanju: " + error.message };
+  } else {
+    const { data: project, error: readError } = await supabase
+      .from("projects")
+      .select("revenue, extra_items")
+      .eq("id", id)
+      .single();
+    if (readError || !project) return { error: "Projekta ni mogoče najti." };
+
+    const sum = (list: CostItem[]) => list.reduce((s, item) => s + item.amount, 0);
+    const base = project.revenue - sum(project.extra_items ?? []);
+    const revenue = Math.round((base + sum(cleaned)) * 100) / 100;
+    const { error } = await supabase
+      .from("projects")
+      .update({ extra_items: cleaned, revenue })
+      .eq("id", id);
+    if (error) return { error: "Napaka pri shranjevanju: " + error.message };
+  }
+
+  revalidatePath("/projekti");
+  return {};
+}
+
 export async function deleteProjectAction(
   id: string
 ): Promise<ProjectActionResult> {

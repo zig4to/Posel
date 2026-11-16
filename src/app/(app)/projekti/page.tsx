@@ -6,7 +6,9 @@ import { getMonthlyTaxes } from "@/lib/data/monthlyTaxes";
 import Button from "@/components/ui/Button";
 import ProjectCard from "@/components/projects/ProjectCard";
 import TaxObligationsButton from "@/components/projects/TaxObligationsButton";
+import SumHoursButton from "@/components/projects/SumHoursButton";
 import { formatEUR } from "@/lib/utils/currency";
+import { isReadOnlyViewer } from "@/lib/sharing";
 import { formatDateKey } from "@/lib/utils/date";
 import {
   formatMonthKey,
@@ -24,10 +26,11 @@ function pad2(n: number): string {
 
 export default async function ProjektiPage() {
   const supabase = await createClient();
-  const [projects, clients, monthlyTaxes] = await Promise.all([
+  const [projects, clients, monthlyTaxes, readOnly] = await Promise.all([
     getProjects(supabase),
     getClients(supabase),
     getMonthlyTaxes(supabase),
+    isReadOnlyViewer(supabase),
   ]);
 
   const groups = new Map<string, ProjectWithClient[]>();
@@ -69,12 +72,24 @@ export default async function ProjektiPage() {
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Vsi projekti</h1>
         <div className="flex items-center gap-2">
-          {clients.length > 0 && (
+          {!readOnly && clients.length > 0 && (
             <Link href="/projekti/nov">
               <Button className="h-8">+ Dodaj projekt</Button>
             </Link>
           )}
-          <TaxObligationsButton />
+          {clients.length > 0 && (
+            <SumHoursButton
+              clients={clients.map((c) => ({ id: c.id, company_name: c.company_name }))}
+              projects={projects.map((p) => ({
+                id: p.id,
+                name: p.name,
+                client_id: p.client_id,
+                work_dates: p.work_dates,
+                day_hours: p.day_hours,
+              }))}
+            />
+          )}
+          {!readOnly && <TaxObligationsButton />}
         </div>
       </div>
 
@@ -82,7 +97,9 @@ export default async function ProjektiPage() {
         <p className="rounded-md border border-dashed border-gray-300 bg-white px-4 py-8 text-center text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400">
           {clients.length === 0
             ? 'Najprej dodaj vsaj enega partnerja v zavihku "Partnerji".'
-            : "Ni projektov. Dodaj prvega z gumbom zgoraj."}
+            : readOnly
+              ? "Ni deljenih projektov."
+              : "Ni projektov. Dodaj prvega z gumbom zgoraj."}
         </p>
       ) : (
         <div className="space-y-6">
@@ -127,11 +144,39 @@ export default async function ProjektiPage() {
 
             return (
               <section key={key}>
-                <h2 className="mb-2 text-base font-semibold text-gray-900 dark:text-gray-100">
-                  {formatMonthKey(key)}
-                </h2>
+                {/* Pregled meseca je skrit; prikaže ga klik na ikono "i" ob mesecu. */}
+                <details className="group/overview">
+                <summary className="mb-2 flex w-fit cursor-pointer list-none items-center gap-1.5 select-none [&::-webkit-details-marker]:hidden">
+                  <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                    {formatMonthKey(key)}
+                  </h2>
+                  <span
+                    className="rounded-full p-0.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-blue-600 group-open/overview:text-blue-600 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-blue-400 dark:group-open/overview:text-blue-400"
+                    aria-label="Pregled meseca"
+                    title="Pregled meseca"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="h-4 w-4"
+                      aria-hidden="true"
+                    >
+                      <circle cx="12" cy="12" r="9" />
+                      <path d="M12 16v-4M12 8h.01" />
+                    </svg>
+                  </span>
+                </summary>
 
-                <div className="mb-3 grid grid-cols-2 gap-3 rounded-md border border-gray-200 border-l-4 border-l-blue-500 bg-white p-3 dark:border-gray-800 dark:border-l-blue-500 dark:bg-gray-900 sm:grid-cols-5">
+                <div
+                  className={
+                    "mb-3 grid gap-3 rounded-md border border-gray-200 border-l-4 border-l-blue-500 bg-white p-3 dark:border-gray-800 dark:border-l-blue-500 dark:bg-gray-900 " +
+                    (readOnly ? "grid-cols-3" : "grid-cols-2 sm:grid-cols-5")
+                  }
+                >
                   <div>
                     <p className="text-xs text-gray-500 dark:text-gray-400">Stroški</p>
                     <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
@@ -150,20 +195,25 @@ export default async function ProjektiPage() {
                       {formatEUR(totals.profit)}
                     </p>
                   </div>
-                  <div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Davčne obveznosti
-                    </p>
-                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                      {formatEUR(tax)}
-                    </p>
-                  </div>
-                  <div className="col-span-2 border-t border-gray-100 pt-2 dark:border-gray-800 sm:col-span-1 sm:border-t-0 sm:pt-0">
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Neto dobiček</p>
-                    <p className="text-base font-semibold text-gray-900 dark:text-gray-100">
-                      {formatEUR(netProfit)}
-                    </p>
-                  </div>
+                  {/* Davki so lastnikovi in niso vezani na stranko - gledalec jih ne vidi. */}
+                  {!readOnly && (
+                    <>
+                      <div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          Davčne obveznosti
+                        </p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          {formatEUR(tax)}
+                        </p>
+                      </div>
+                      <div className="col-span-2 border-t border-gray-100 pt-2 dark:border-gray-800 sm:col-span-1 sm:border-t-0 sm:pt-0">
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Neto dobiček</p>
+                        <p className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                          {formatEUR(netProfit)}
+                        </p>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {(splits.length > 0 || movedOut.length > 0) && (
@@ -197,6 +247,7 @@ export default async function ProjektiPage() {
                     </ul>
                   </div>
                 )}
+                </details>
 
                 {monthProjects.length === 0 ? (
                   <p className="text-sm text-gray-400 dark:text-gray-500">
@@ -225,7 +276,7 @@ export default async function ProjektiPage() {
 
                     <div className="space-y-2">
                       {monthProjects.map((project) => (
-                        <ProjectCard key={project.id} project={project} />
+                        <ProjectCard key={project.id} project={project} readOnly={readOnly} />
                       ))}
                     </div>
                   </details>

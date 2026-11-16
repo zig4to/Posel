@@ -15,6 +15,8 @@ type ItemRowsProps = {
   /** Ime postavke za oznake dostopnosti (npr. "stroška", "storitve"). */
   itemLabel: string;
   notePlaceholder?: string;
+  /** Klic ob kliku na "+" s trenutnimi postavkami (pred dodano prazno vrstico). */
+  onAdd?: (items: ItemFields[]) => void;
 };
 
 /** Seznam postavk znesek + opomba z gumboma za dodajanje/odstranjevanje. */
@@ -24,6 +26,7 @@ export default function ItemRows({
   idPrefix,
   itemLabel,
   notePlaceholder = "Opomba",
+  onAdd,
 }: ItemRowsProps) {
   function update(index: number, patch: Partial<ItemFields>) {
     onChange(items.map((item, i) => (i === index ? { ...item, ...patch } : item)));
@@ -60,7 +63,10 @@ export default function ItemRows({
               type="button"
               variant="secondary"
               className="h-9 w-9 flex-shrink-0 px-0"
-              onClick={() => onChange([...items, EMPTY_ITEM])}
+              onClick={() => {
+                onAdd?.(items);
+                onChange([...items, EMPTY_ITEM]);
+              }}
               aria-label={`Dodaj postavko ${itemLabel}`}
             >
               +
