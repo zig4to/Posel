@@ -4,6 +4,7 @@ import { getProjects } from "@/lib/data/projects";
 import { getClients } from "@/lib/data/clients";
 import { getMonthlyTaxes } from "@/lib/data/monthlyTaxes";
 import Button from "@/components/ui/Button";
+import MonthIcon from "@/components/projects/MonthIcon";
 import ProjectCard from "@/components/projects/ProjectCard";
 import TaxObligationsButton from "@/components/projects/TaxObligationsButton";
 import SumHoursButton from "@/components/projects/SumHoursButton";
@@ -69,12 +70,26 @@ export default async function ProjektiPage() {
 
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between gap-2">
-        <h1 className="min-w-0 truncate text-lg font-semibold text-gray-900 dark:text-gray-100 sm:text-xl">Vsi projekti</h1>
-        <div className="flex flex-shrink-0 items-center gap-1.5 sm:gap-2">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-x-2 gap-y-2">
+        <h1 className="flex-shrink-0 whitespace-nowrap text-lg font-semibold text-gray-900 dark:text-gray-100 sm:text-xl">Vsi projekti</h1>
+        <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1.5 sm:gap-2">
           {!readOnly && clients.length > 0 && (
-            <Link href="/projekti/nov">
-              <Button className="h-8 whitespace-nowrap px-2.5 text-xs sm:px-3 sm:text-sm">+ Dodaj projekt</Button>
+            <Link href="/projekti/nov" aria-label="Dodaj projekt" title="Dodaj projekt">
+              <Button type="button" className="h-8 w-8 rounded-full px-0 shadow-sm transition-transform hover:scale-105 active:scale-95">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-5 w-5"
+                  aria-hidden="true"
+                >
+                  <path d="M12 5v14" />
+                  <path d="M5 12h14" />
+                </svg>
+              </Button>
             </Link>
           )}
           {clients.length > 0 && (
@@ -124,7 +139,7 @@ export default async function ProjektiPage() {
               : "Ni projektov. Dodaj prvega z gumbom zgoraj."}
         </p>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-5">
           {sortedKeys.map((key) => {
             const monthProjects = groups.get(key) ?? [];
             const tax = taxByMonth.get(key) ?? 0;
@@ -165,11 +180,15 @@ export default async function ProjektiPage() {
             );
 
             return (
-              <section key={key}>
+              <section
+                key={key}
+                className="rounded-xl border border-gray-200 bg-gray-50 p-3 shadow-sm dark:border-gray-800 dark:bg-gray-800/30 sm:p-4"
+              >
                 {/* Pregled meseca je skrit; prikaže ga klik na ikono "i" ob mesecu. */}
                 <details className="group/overview">
-                <summary className="mb-2 flex w-fit cursor-pointer list-none items-center gap-1.5 select-none [&::-webkit-details-marker]:hidden">
-                  <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                <summary className="mb-3 flex w-fit cursor-pointer list-none items-center gap-1.5 select-none [&::-webkit-details-marker]:hidden">
+                  <MonthIcon monthKey={key} />
+                  <h2 className="ml-0.5 text-lg font-bold text-gray-900 dark:text-gray-100">
                     {formatMonthKey(key)}
                   </h2>
                   <span
@@ -276,7 +295,10 @@ export default async function ProjektiPage() {
                     Ni projektov ta mesec.
                   </p>
                 ) : (
-                  <details className="group" open={key === currentMonthKey}>
+                  <details
+                    className="group border-t border-gray-200 pt-3 dark:border-gray-700"
+                    open={key === currentMonthKey}
+                  >
                     <summary className="mb-2 flex cursor-pointer list-none items-center gap-1.5 text-sm font-semibold text-gray-900 select-none dark:text-gray-100 [&::-webkit-details-marker]:hidden">
                       <svg
                         viewBox="0 0 24 24"

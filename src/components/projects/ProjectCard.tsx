@@ -4,7 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import type { ProjectWithClient } from "@/lib/types/database.types";
 import { ColorDot } from "@/components/ui/Badge";
-import Button from "@/components/ui/Button";
 import DeleteProjectButton from "@/components/projects/DeleteProjectButton";
 import InvoiceButton from "@/components/projects/InvoiceButton";
 import { formatEUR } from "@/lib/utils/currency";
@@ -25,8 +24,8 @@ import {
   workMonths,
 } from "@/lib/utils/projectMonths";
 
-// Na računalniku (md+) manjši gumbi enake širine, zloženi drug nad drugim.
-const CARD_BUTTON_CLASS = "md:w-full md:px-2.5 md:py-1 md:text-xs";
+// Na računalniku (md+) manjši gumbi.
+const CARD_BUTTON_CLASS = "md:px-2.5 md:py-1 md:text-xs";
 
 // "22, 23. Oktober · 2, 3, 4. November 2026" - dnevi po mesecih; leto se
 // izpiše ob vsakem mesecu le, če projekt sega čez novo leto.
@@ -54,7 +53,7 @@ export default function ProjectCard({
   /** Samo ogled (deljen projekt) - brez gumbov Uredi/Izbriši. */
   readOnly?: boolean;
 }) {
-  const [showNotes, setShowNotes] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const costItems = project.cost_items ?? [];
   const costs = projectTotalCosts(project);
   const fuel = projectFuelCost(project);
@@ -65,10 +64,7 @@ export default function ProjectCard({
   const extraItems = project.extra_items ?? [];
   const extras = sumCostItems(extraItems);
   const extraNotes = extraItems.filter((item) => item.note && item.note.trim());
-  const hasNotes =
-    Boolean(project.note) || costNotes.length > 0 || extraNotes.length > 0;
-  // Gorivo, ure in dodatne storitve so na računalniku skriti iz osnovnega
-  // pogleda (pod "Podrobnosti").
+  // Gorivo, ure in dodatne storitve se pokažejo v razširjenem pogledu.
   const hasExtra = fuel > 0 || totalHours > 0 || extras > 0;
   const extrasLabel = extras > 0 ? `Dodatno: ${formatEUR(extras)}` : null;
   const hoursLabel =
@@ -94,13 +90,21 @@ export default function ProjectCard({
 
   return (
     <div
-      className="rounded-md border bg-white px-4 py-3 dark:bg-gray-900 md:px-4 md:py-3"
+      className="rounded-md border bg-white px-4 py-3 dark:bg-gray-900"
       style={{ borderColor: clientColor }}
     >
-      {/* Na računalniku (md+) vse v eni vrstici: podatki | zneski | gumbi. */}
-      <div className="md:flex md:items-center md:gap-4">
-        <div className="min-w-0 md:flex-1">
-          <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100 md:text-base">
+      {/* Zaprta kartica: ime projekta, partner in datum; klik odpre urejanje, puščica desno. */}
+      <div className="relative flex items-center gap-3">
+        {/* Klik kamorkoli na vrstici odpre urejanje (puščica ima prednost). */}
+        {!readOnly && (
+          <Link
+            href={`/projekti/${project.id}/uredi`}
+            aria-label={`Uredi projekt ${project.name}`}
+            className="absolute -inset-x-4 -inset-y-3 rounded-md"
+          />
+        )}
+        <div className="min-w-0 flex-1">
+          <p className="break-words text-sm font-semibold text-gray-900 dark:text-gray-100 md:text-base">
             {project.name}
           </p>
           <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
@@ -123,78 +127,64 @@ export default function ProjectCard({
           </div>
         </div>
 
-        <div className="mt-3 grid grid-cols-3 gap-2 border-t border-gray-100 pt-3 dark:border-gray-800 md:mt-0 md:flex-shrink-0 md:grid-cols-[repeat(3,auto)] md:gap-x-5 md:border-t-0 md:pt-0 md:text-right">
-          <div>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Priliv</p>
-            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-              {formatEUR(project.revenue)}
-            </p>
-            {extrasLabel && (
-              <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400 md:hidden">
-                {extrasLabel}
-              </p>
-            )}
-          </div>
-          {/* Pokončna črta loči stroške od dobička. */}
-          <div className="border-r border-gray-200 pr-2 dark:border-gray-700 md:pr-5">
-            <p className="text-xs text-gray-500 dark:text-gray-400">Stroški</p>
-            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-              {formatEUR(costs)}
-            </p>
-            {fuelLabel && (
-              <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400 md:hidden">
-                {fuelLabel}
-              </p>
-            )}
-          </div>
-          <div>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Dobiček</p>
-            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-              {formatEUR(profit)}
-            </p>
-            {hoursLabel && (
-              <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400 md:hidden">
-                {hoursLabel}
-              </p>
-            )}
-          </div>
-        </div>
-
-        <div className="mt-3 flex flex-wrap gap-2 md:ml-auto md:mt-0 md:w-32 md:flex-shrink-0 md:flex-col md:gap-1">
-          {!readOnly && (
-            <>
-              <Link href={`/projekti/${project.id}/uredi`} className="md:block">
-                <Button type="button" variant="secondary" className={CARD_BUTTON_CLASS}>
-                  Uredi
-                </Button>
-              </Link>
-              <DeleteProjectButton projectId={project.id} className={CARD_BUTTON_CLASS} />
-              <InvoiceButton project={project} className={CARD_BUTTON_CLASS} />
-            </>
-          )}
-          {(hasNotes || hasExtra) && (
-            // Brez opomb je gumb viden samo na računalniku (za gorivo/ure).
-            <span className={hasNotes ? "contents" : "hidden md:contents"}>
-              <Button
-                type="button"
-                variant="ghost"
-                className={CARD_BUTTON_CLASS}
-                onClick={() => setShowNotes((v) => !v)}
-              >
-                <span className="md:hidden">{showNotes ? "Skrij opombe" : "Opombe"}</span>
-                <span className="hidden md:inline">
-                  {showNotes ? "Skrij podrobnosti" : "Podrobnosti"}
-                </span>
-              </Button>
-            </span>
-          )}
-        </div>
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          aria-label={expanded ? "Skrij podrobnosti" : "Pokaži podrobnosti"}
+          title={expanded ? "Skrij podrobnosti" : "Pokaži podrobnosti"}
+          className="relative z-10 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={`h-5 w-5 transition-transform ${expanded ? "rotate-180" : ""}`}
+            aria-hidden="true"
+          >
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </button>
       </div>
 
-      {showNotes && (
-        <div className="mt-3 space-y-2 border-t border-gray-100 pt-3 dark:border-gray-800 md:mt-2 md:pt-2">
+      {expanded && (
+        <div className="mt-3 space-y-3 border-t border-gray-100 pt-3 dark:border-gray-800">
+          <div className="md:flex md:items-center md:gap-4">
+            <div className="grid grid-cols-3 gap-2 md:flex-1 md:grid-cols-[repeat(3,auto)] md:justify-start md:gap-x-8">
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Priliv</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                  {formatEUR(project.revenue)}
+                </p>
+              </div>
+              {/* Pokončna črta loči stroške od dobička. */}
+              <div className="border-r border-gray-200 pr-2 dark:border-gray-700 md:pr-8">
+                <p className="text-xs text-gray-500 dark:text-gray-400">Stroški</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                  {formatEUR(costs)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Dobiček</p>
+                <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                  {formatEUR(profit)}
+                </p>
+              </div>
+            </div>
+
+            {!readOnly && (
+              <div className="mt-3 flex flex-wrap gap-2 md:mt-0 md:flex-shrink-0">
+                <DeleteProjectButton projectId={project.id} className={CARD_BUTTON_CLASS} />
+                <InvoiceButton project={project} className={CARD_BUTTON_CLASS} />
+              </div>
+            )}
+          </div>
+
           {hasExtra && (
-            <p className="hidden text-xs text-gray-500 dark:text-gray-400 md:block">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               {[extrasLabel, fuelLabel, hoursLabel].filter(Boolean).join(" · ")}
             </p>
           )}

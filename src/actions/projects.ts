@@ -397,6 +397,80 @@ export async function setProjectDayHoursAction(
   return {};
 }
 
+export type QuickDayEntryInput = {
+  id: string;
+  date: string;
+  hours: number;
+  /** Prevoženi km za dan; 0 = brez goriva. */
+  km: number;
+  /** Gorivo deljeno s prijateljem (½). */
+  shared: boolean;
+  /** Strošek malice v EUR; 0 = brez malice. */
+  meal: number;
+};
+
+/**
+ * Poenostavljen dnevni vpis: ure + km (z oznako ½) + malica naenkrat.
+ * Malica se zapiše kot postavka stroškov z opombo "Malica D. M.", ob ponovnem
+ * vpisu za isti dan se nadomesti.
+ */
+export async function quickDayEntryAction(
+  input: QuickDayEntryInput
+): Promise<ProjectActionResult> {
+  const { id, date, hours, km, shared, meal } = input;
+  if (!DATE_RE.test(date)) return { error: "Neveljaven datum." };
+  if (!(hours >= 0 && hours <= 24)) return { error: "Ure morajo biti med 0 in 24." };
+  if (!(km >= 0 && km <= 5000)) return { error: "Neveljavno število km." };
+  if (!(meal >= 0 && meal <= 10000)) return { error: "Neveljaven znesek malice." };
+
+  const supabase = await createClient();
+  const { data: project, error: readError } = await supabase
+    .from("projects")
+    .select(
+      "client_id, work_dates, day_hours, day_km, fuel_shared_dates, day_times, day_notes, hourly_rate, extra_items, cost_items"
+    )
+    .eq("id", id)
+    .single();
+  if (readError) {
+    return { error: "Napaka pri branju projekta: " + readError.message };
+  }
+
+  const day_hours: DayHours = { ...(project.day_hours ?? {}) };
+  if (hours > 0) day_hours[date] = Math.round(hours * 100) / 100;
+  else delete day_hours[date];
+
+  const day_km: DayKm = { ...(project.day_km ?? {}) };
+  if (km > 0) day_km[date] = Math.round(km * 10) / 10;
+  else delete day_km[date];
+
+  const sharedSet = new Set(project.fuel_shared_dates ?? []);
+  if (km > 0 && shared) sharedSet.add(date);
+  else sharedSet.delete(date);
+
+  const [, m, d] = date.split("-");
+  const mealNote = `Malica ${Number(d)}. ${Number(m)}.`;
+  const cost_items = (project.cost_items ?? []).filter((item) => item.note !== mealNote);
+  if (meal > 0) cost_items.push({ amount: Math.round(meal * 100) / 100, note: mealNote });
+
+  const revenue = hourlyRevenue(project, day_hours);
+  const { error } = await supabase
+    .from("projects")
+    .update({
+      work_dates: normalizeDates([...project.work_dates, date]),
+      day_hours,
+      day_km,
+      fuel_shared_dates: normalizeDates([...sharedSet]),
+      cost_items,
+      ...(revenue === null ? {} : { revenue }),
+    })
+    .eq("id", id);
+  if (error) return { error: "Napaka pri vpisu: " + error.message };
+
+  revalidatePath("/");
+  revalidatePath("/projekti");
+  return {};
+}
+
 export type AddProjectDaysInput = {
   /** Obstoječ projekt; null = nov projekt. */
   project_id: string | null;
